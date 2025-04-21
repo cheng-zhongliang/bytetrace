@@ -1,0 +1,13 @@
+module bytetrace
+
+go 1.24.2
+
+require (
+	github.com/cilium/ebpf v0.18.0
+	github.com/olekukonko/tablewriter v0.0.5
+)
+
+require (
+	github.com/mattn/go-runewidth v0.0.9 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+)
