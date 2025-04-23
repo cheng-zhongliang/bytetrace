@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/cilium/ebpf"
@@ -19,6 +20,14 @@ type sample struct {
 	Event *tracepointEvent
 }
 
+type Option struct {
+	Proto uint8
+	Saddr net.IP
+	Daddr net.IP
+	Sport uint16
+	Dport uint16
+}
+
 type Bytetrace struct {
 	Coll    *ebpf.Collection
 	Maps    tracepointMaps
@@ -29,7 +38,17 @@ type Bytetrace struct {
 	Table   *tablewriter.Table
 }
 
-func NewBytetrace(opt tracepointOption) (*Bytetrace, error) {
+func ToTracepointOption(opt Option) tracepointOption {
+	return tracepointOption{
+		Proto: opt.Proto,
+		Saddr: ipToInt(opt.Saddr),
+		Daddr: ipToInt(opt.Daddr),
+		Sport: opt.Sport,
+		Dport: opt.Dport,
+	}
+}
+
+func NewBytetrace(opt Option) (*Bytetrace, error) {
 	b := new(Bytetrace)
 
 	collSpec, err := loadTracepoint()
@@ -46,8 +65,7 @@ func NewBytetrace(opt tracepointOption) (*Bytetrace, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	b.Option = opt
+	b.Option = ToTracepointOption(opt)
 	b.Samples = make(map[uint64]*list.List)
 	b.Links = make([]link.Link, 0, len(b.Coll.Programs))
 	b.Table = tablewriter.NewWriter(os.Stdout)

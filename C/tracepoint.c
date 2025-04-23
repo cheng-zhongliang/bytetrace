@@ -86,13 +86,13 @@ static __always_inline int filter_by_option(struct skb_context* skb_ctx)
         return -1;
     }
 
-    // if(opt->saddr && opt->saddr != skb_ctx->ip.saddr) {
-    //     return -1;
-    // }
+    if(opt->saddr && opt->saddr != skb_ctx->ip.saddr) {
+        return -1;
+    }
 
-    // if(opt->daddr && opt->daddr != skb_ctx->ip.daddr) {
-    //     return -1;
-    // }
+    if(opt->daddr && opt->daddr != skb_ctx->ip.daddr) {
+        return -1;
+    }
 
     return 0;
 }
