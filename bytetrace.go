@@ -129,38 +129,6 @@ func (b *Bytetrace) Poll() error {
 	}
 }
 
-func (b *Bytetrace) Output(l *list.List) {
-	b.Table.ClearRows()
-	b.Table.SetHeader([]string{
-		"Symbol",
-		"Source",
-		"Destination",
-		"Protocol",
-		"SPort",
-		"DPort",
-	})
-	b.Table.SetHeaderColor(
-		tablewriter.Colors{tablewriter.BgGreenColor},
-		tablewriter.Colors{tablewriter.BgRedColor},
-		tablewriter.Colors{tablewriter.BgRedColor},
-		tablewriter.Colors{tablewriter.BgBlueColor},
-		tablewriter.Colors{tablewriter.BgYellowColor},
-		tablewriter.Colors{tablewriter.BgYellowColor},
-	)
-	for e := l.Front(); e != nil; e = e.Next() {
-		ev := e.Value.(*sample).Event
-		b.Table.Append([]string{
-			string(ev.Symbol[:]),
-			intToIP(ev.Saddr).String(),
-			intToIP(ev.Daddr).String(),
-			fmt.Sprintf("%d", ev.Proto),
-			fmt.Sprintf("%d", ev.Sport),
-			fmt.Sprintf("%d", ev.Dport),
-		})
-	}
-	b.Table.Render()
-}
-
 func (b *Bytetrace) OnEvent(ev tracepointEvent) {
 	sp := new(sample)
 	sp.Event = &ev
@@ -176,4 +144,28 @@ func (b *Bytetrace) OnEvent(ev tracepointEvent) {
 		}
 		delete(b.Samples, ev.SkbPtr)
 	}
+}
+
+func (b *Bytetrace) Output(l *list.List) {
+	b.Table.ClearRows()
+	b.Table.SetHeader([]string{
+		"Symbol",
+		"Source",
+		"Destination",
+		"Protocol",
+		"SPort",
+		"DPort",
+	})
+	for e := l.Front(); e != nil; e = e.Next() {
+		ev := e.Value.(*sample).Event
+		b.Table.Append([]string{
+			string(ev.Symbol[:]),
+			intToIP(ev.Saddr).String(),
+			intToIP(ev.Daddr).String(),
+			fmt.Sprintf("%d", ev.Proto),
+			fmt.Sprintf("%d", ev.Sport),
+			fmt.Sprintf("%d", ev.Dport),
+		})
+	}
+	b.Table.Render()
 }
