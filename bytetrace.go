@@ -65,6 +65,7 @@ func NewBytetrace(opt Option) (*Bytetrace, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	b.Option = ToTracepointOption(opt)
 	b.Samples = make(map[uint64]*list.List)
 	b.Links = make([]link.Link, 0, len(b.Coll.Programs))
