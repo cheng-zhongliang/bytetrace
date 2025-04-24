@@ -2,11 +2,8 @@ package bytetrace
 
 import (
 	"bytes"
-	"bytetrace/pkg/utils"
-	"container/list"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"os"
 
 	"github.com/cilium/ebpf"
@@ -15,19 +12,14 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-type sample struct {
-	Ele   *list.Element
-	Event *tracepointEvent
-}
-
 type Bytetrace struct {
-	Coll    *ebpf.Collection
-	Maps    tracepointMaps
-	Links   []link.Link
-	Ring    *ringbuf.Reader
-	Option  tracepointOption
-	Samples map[uint64]*list.List
-	Table   *tablewriter.Table
+	coll    *ebpf.Collection
+	maps    tracepointMaps
+	links   []link.Link
+	ring    *ringbuf.Reader
+	option  tracepointOption
+	samples *samples
+	table   *tablewriter.Table
 }
 
 func New(opt Option) (*Bytetrace, error) {
@@ -38,36 +30,36 @@ func New(opt Option) (*Bytetrace, error) {
 		return nil, err
 	}
 
-	b.Coll, err = ebpf.NewCollection(cs)
+	b.coll, err = ebpf.NewCollection(cs)
 	if err != nil {
 		return nil, err
 	}
 
-	err = b.Coll.Assign(&b.Maps)
+	err = b.coll.Assign(&b.maps)
 	if err != nil {
 		return nil, err
 	}
 
-	b.Option = opt.toTracepointOption()
-	b.Samples = make(map[uint64]*list.List)
-	b.Links = make([]link.Link, 0, len(b.Coll.Programs))
-	b.Table = tablewriter.NewWriter(os.Stdout)
+	b.option = opt.toTracepointOption()
+	b.samples = newSamples()
+	b.links = make([]link.Link, 0, len(b.coll.Programs))
+	b.table = tablewriter.NewWriter(os.Stdout)
 
 	return b, nil
 }
 
 func (b *Bytetrace) Attach() error {
-	err := b.Maps.Options.Put(uint32(0), &b.Option)
+	err := b.maps.Options.Put(uint32(0), &b.option)
 	if err != nil {
 		return err
 	}
 
-	b.Ring, err = ringbuf.NewReader(b.Maps.Events)
+	b.ring, err = ringbuf.NewReader(b.maps.Events)
 	if err != nil {
 		return err
 	}
 
-	for sym, prog := range b.Coll.Programs {
+	for sym, prog := range b.coll.Programs {
 		var l link.Link
 		var err error
 		switch prog.Type() {
@@ -83,28 +75,28 @@ func (b *Bytetrace) Attach() error {
 		if err != nil {
 			return err
 		}
-		b.Links = append(b.Links, l)
+		b.links = append(b.links, l)
 	}
 
 	return nil
 }
 
 func (b *Bytetrace) Detach() error {
-	if err := b.Ring.Close(); err != nil {
+	if err := b.ring.Close(); err != nil {
 		return err
 	}
 
-	for _, l := range b.Links {
+	for _, l := range b.links {
 		if err := l.Close(); err != nil {
 			return err
 		}
 	}
 
-	if err := b.Maps.Close(); err != nil {
+	if err := b.maps.Close(); err != nil {
 		return err
 	}
 
-	b.Coll.Close()
+	b.coll.Close()
 
 	return nil
 }
@@ -112,7 +104,7 @@ func (b *Bytetrace) Detach() error {
 func (b *Bytetrace) Poll() error {
 	var event tracepointEvent
 	for {
-		record, err := b.Ring.Read()
+		record, err := b.ring.Read()
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
 				return nil
@@ -126,47 +118,16 @@ func (b *Bytetrace) Poll() error {
 			continue
 		}
 
-		b.OnEvent(event)
+		b.onEvent(event)
 	}
 }
 
-func (b *Bytetrace) OnEvent(ev tracepointEvent) {
-	sp := new(sample)
-	sp.Event = &ev
+func (b *Bytetrace) onEvent(ev tracepointEvent) {
+	key := ev.SkbPtr
 
-	if _, ok := b.Samples[ev.SkbPtr]; !ok {
-		b.Samples[ev.SkbPtr] = list.New()
-	}
-	sp.Ele = b.Samples[ev.SkbPtr].PushBack(sp)
+	b.samples.add(key, newSample(&ev))
 
 	if isFinshed := ev.Finish != 0; isFinshed {
-		if l, ok := b.Samples[ev.SkbPtr]; ok {
-			b.Output(l)
-		}
-		delete(b.Samples, ev.SkbPtr)
+		b.samples.outputAndRemove(key)
 	}
-}
-
-func (b *Bytetrace) Output(l *list.List) {
-	b.Table.ClearRows()
-	b.Table.SetHeader([]string{
-		"Symbol",
-		"Source",
-		"Destination",
-		"Protocol",
-		"SPort",
-		"DPort",
-	})
-	for e := l.Front(); e != nil; e = e.Next() {
-		ev := e.Value.(*sample).Event
-		b.Table.Append([]string{
-			string(ev.Symbol[:]),
-			utils.IntToIP(ev.Saddr).String(),
-			utils.IntToIP(ev.Daddr).String(),
-			fmt.Sprintf("%d", ev.Proto),
-			fmt.Sprintf("%d", ev.Sport),
-			fmt.Sprintf("%d", ev.Dport),
-		})
-	}
-	b.Table.Render()
 }
