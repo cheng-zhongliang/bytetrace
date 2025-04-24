@@ -51,12 +51,12 @@ func ToTracepointOption(opt Option) tracepointOption {
 func NewBytetrace(opt Option) (*Bytetrace, error) {
 	b := new(Bytetrace)
 
-	collSpec, err := loadTracepoint()
+	cs, err := loadTracepoint()
 	if err != nil {
 		return nil, err
 	}
 
-	b.Coll, err = ebpf.NewCollection(collSpec)
+	b.Coll, err = ebpf.NewCollection(cs)
 	if err != nil {
 		return nil, err
 	}
