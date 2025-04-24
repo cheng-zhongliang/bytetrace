@@ -53,12 +53,23 @@ static __always_inline int parse_ipv4(struct sk_buff* skb, struct skb_context* s
     return 0;
 }
 
+static __always_inline int parse_l4(struct sk_buff* skb, struct skb_context* skb_ctx)
+{
+    return 0;
+}
+
 static __always_inline int parse_l3(struct sk_buff* skb, struct skb_context* skb_ctx)
 {
     switch(bpf_ntohs(skb_ctx->eth.h_proto)) {
-    case ETH_P_IP: return parse_ipv4(skb, skb_ctx);
+    case ETH_P_IP: {
+        if(parse_ipv4(skb, skb_ctx)) {
+            return -1;
+        }
+        break;
+    };
     default: return -1;
     }
+    return parse_l4(skb, skb_ctx);
 }
 
 static __always_inline int parse_l2(struct sk_buff* skb, struct skb_context* skb_ctx)
