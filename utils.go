@@ -12,8 +12,8 @@ func intToIP(ipNum uint32) net.IP {
 }
 
 func ipToInt(ip net.IP) uint32 {
-	if ip == nil {
+	if ip = ip.To4(); ip == nil {
 		return 0
 	}
-	return binary.LittleEndian.Uint32(ip.To4())
+	return binary.LittleEndian.Uint32(ip)
 }
