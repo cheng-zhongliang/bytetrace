@@ -1,4 +1,4 @@
-bytetrace
+build/bytetrace
 vmlinux.h
 tracepoint.o
 tracepoint.go
