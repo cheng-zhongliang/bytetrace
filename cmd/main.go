@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytetrace/pkg/bytetrace"
 	"os"
 	"os/signal"
 	"syscall"
@@ -8,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var opt Option
+var opt bytetrace.Option
 
 var cmd = &cobra.Command{
 	Use:                   "bytetrace [flags] <args>",
@@ -28,8 +29,8 @@ func init() {
 	cmd.Flags().Uint16VarP(&opt.Dport, "dport", "D", 0, "destination port")
 }
 
-func Do(opt Option) (err error) {
-	b, err := NewBytetrace(opt)
+func Do(opt bytetrace.Option) (err error) {
+	b, err := bytetrace.New(opt)
 	if err != nil {
 		return err
 	}
