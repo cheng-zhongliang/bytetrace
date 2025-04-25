@@ -8,6 +8,10 @@ go mod tidy
 
 cd $home/pkg/bytetrace/
 
+bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+
+go get github.com/cilium/ebpf/cmd/bpf2go
+
 go run github.com/cilium/ebpf/cmd/bpf2go -target amd64 -tags linux -go-package bytetrace tracepoint C/tracepoint.c
 
 mv tracepoint_x86_bpfel.go tracepoint.go
