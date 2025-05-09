@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"os"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
-	"github.com/olekukonko/tablewriter"
 )
 
 type Bytetrace struct {
@@ -19,7 +17,6 @@ type Bytetrace struct {
 	ring    *ringbuf.Reader
 	option  tracepointOption
 	samples *samples
-	table   *tablewriter.Table
 }
 
 func New(opt Option) (*Bytetrace, error) {
@@ -43,7 +40,6 @@ func New(opt Option) (*Bytetrace, error) {
 	b.option = opt.toTracepointOption()
 	b.samples = newSamples()
 	b.links = make([]link.Link, 0, len(b.coll.Programs))
-	b.table = tablewriter.NewWriter(os.Stdout)
 
 	return b, nil
 }
