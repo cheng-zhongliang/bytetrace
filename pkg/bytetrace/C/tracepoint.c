@@ -17,17 +17,17 @@ struct option {
 };
 
 struct event {
-    u8 symbol[64];
     u64 skb_ptr;
+    u16 reason;
     u8 proto;
     u32 saddr;
     u32 daddr;
     u16 sport;
     u16 dport;
-    u8 finish;
 };
 
 struct skb_context {
+    u16 reason;
     struct ethhdr eth;
     struct iphdr ip;
 };
@@ -80,12 +80,12 @@ static __always_inline int parse_l2(struct sk_buff* skb, struct skb_context* skb
     return parse_l3(skb, skb_ctx);
 }
 
-static __always_inline int parse_skb(struct sk_buff* skb, struct skb_context* skb_ctx)
+static __always_inline int parse(struct sk_buff* skb, struct skb_context* skb_ctx)
 {
     return parse_l2(skb, skb_ctx);
 }
 
-static __always_inline int filter_by_option(struct skb_context* skb_ctx)
+static __always_inline int filter(struct skb_context* skb_ctx)
 {
     int _key = 0;
     struct option* opt = bpf_map_lookup_elem(&options, &_key);
@@ -108,59 +108,54 @@ static __always_inline int filter_by_option(struct skb_context* skb_ctx)
     return 0;
 }
 
-static __always_inline int
-submit_event(char* symbol, u8 finish, struct sk_buff* skb, struct skb_context* skb_ctx)
+static __always_inline int submit(struct sk_buff* skb, struct skb_context* skb_ctx)
 {
-    struct event* ev = bpf_ringbuf_reserve(&events, sizeof(struct event), 0);
-    if(!ev) {
-        return -1;
-    }
+    struct event e;
 
-    bpf_probe_read_str(ev->symbol, sizeof(ev->symbol), symbol);
+    e.skb_ptr = (u64)skb;
+    e.reason = skb_ctx->reason;
+    e.proto = skb_ctx->ip.protocol;
+    e.saddr = skb_ctx->ip.saddr;
+    e.daddr = skb_ctx->ip.daddr;
+    e.sport = 0;
+    e.dport = 0;
 
-    ev->skb_ptr = (u64)skb;
-    ev->proto = skb_ctx->ip.protocol;
-    ev->saddr = skb_ctx->ip.saddr;
-    ev->daddr = skb_ctx->ip.daddr;
-    ev->sport = 0;
-    ev->dport = 0;
-    ev->finish = finish;
-
-    bpf_ringbuf_submit(ev, 0);
-
-    return 0;
+    return bpf_ringbuf_output(&events, &e, sizeof(e), 0);
 }
 
-SEC("kprobe/ip_rcv_core")
-int BPF_KPROBE(ip_rcv_core, struct sk_buff* skb, struct net* net)
+static __always_inline int trace(void* ctx, struct sk_buff* skb, struct skb_context* skb_ctx)
 {
-    struct skb_context skb_ctx = { 0 };
-
-    if(parse_skb(skb, &skb_ctx)) {
+    if(parse(skb, skb_ctx)) {
         return 0;
     }
 
-    if(filter_by_option(&skb_ctx)) {
+    if(filter(skb_ctx)) {
         return 0;
     }
 
-    return submit_event("ip_rcv_core", 1, skb, &skb_ctx);
+    return submit(skb, skb_ctx);
 }
+#define info_tp_args(ctx, offset, index) (void*)((u64*)(ctx) + index)
 
-SEC("tp_btf/netif_receive_skb")
-int BPF_PROG(netif_receive_skb, struct sk_buff* skb)
+SEC("tp_btf/kfree_skb")
+int BPF_PROG(kfree_skb, struct sk_buff* skb)
 {
-    struct skb_context skb_ctx = { 0 };
+    struct skb_context skb_ctx;
+    int reason;
 
-    if(parse_skb(skb, &skb_ctx)) {
+    if(bpf_core_type_exists(enum skb_drop_reason)) {
+        reason = *(int*)info_tp_args(ctx, 28, 2);
+    } else {
         return 0;
     }
 
-    if(filter_by_option(&skb_ctx)) {
+    if(reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
         return 0;
     }
+   
+    skb_ctx.reason = reason;
 
-    return submit_event("netif_receive_skb", 0, skb, &skb_ctx);
+    return trace(ctx, skb, &skb_ctx);
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
