@@ -4,95 +4,49 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 
-	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 )
 
 type Bytetrace struct {
-	coll    *ebpf.Collection
-	maps    tracepointMaps
-	links   []link.Link
-	ring    *ringbuf.Reader
-	option  tracepointOption
-	samples *samples
+	objs   tracepointObjects
+	link   link.Link
+	ring   *ringbuf.Reader
+	option tracepointOption
 }
 
 func New(opt Option) (*Bytetrace, error) {
 	b := new(Bytetrace)
 
-	cs, err := loadTracepoint()
-	if err != nil {
-		return nil, err
-	}
-
-	b.coll, err = ebpf.NewCollection(cs)
-	if err != nil {
-		return nil, err
-	}
-
-	err = b.coll.Assign(&b.maps)
+	err := loadTracepointObjects(&b.objs, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	b.option = opt.toTracepointOption()
-	b.samples = newSamples()
-	b.links = make([]link.Link, 0, len(b.coll.Programs))
 
 	return b, nil
 }
 
 func (b *Bytetrace) Attach() error {
-	err := b.maps.Options.Put(uint32(0), &b.option)
+	err := b.objs.tracepointMaps.Options.Put(uint32(0), &b.option)
 	if err != nil {
 		return err
 	}
 
-	b.ring, err = ringbuf.NewReader(b.maps.Events)
+	b.ring, err = ringbuf.NewReader(b.objs.tracepointMaps.Events)
 	if err != nil {
 		return err
 	}
 
-	for sym, prog := range b.coll.Programs {
-		var l link.Link
-		var err error
-		switch prog.Type() {
-		case ebpf.Kprobe:
-			l, err = link.Kprobe(sym, prog, nil)
-		case ebpf.Tracing:
-			l, err = link.AttachTracing(link.TracingOptions{
-				Program: prog,
-			})
-		default:
-			return errors.ErrUnsupported
-		}
-		if err != nil {
-			return err
-		}
-		b.links = append(b.links, l)
-	}
-
-	return nil
-}
-
-func (b *Bytetrace) Detach() error {
-	if err := b.ring.Close(); err != nil {
+	b.link, err = link.AttachTracing(link.TracingOptions{
+		Program: b.objs.tracepointPrograms.KfreeSkb,
+	})
+	if err != nil {
 		return err
 	}
-
-	for _, l := range b.links {
-		if err := l.Close(); err != nil {
-			return err
-		}
-	}
-
-	if err := b.maps.Close(); err != nil {
-		return err
-	}
-
-	b.coll.Close()
 
 	return nil
 }
@@ -120,10 +74,14 @@ func (b *Bytetrace) Poll() error {
 
 func (b *Bytetrace) onEvent(ev tracepointEvent) {
 	key := ev.SkbPtr
+	reason := ev.Reason
+	fmt.Printf("%v %v\n", key, reason)
+}
 
-	b.samples.add(key, newSample(&ev))
-
-	if isFinshed := ev.Finish != 0; isFinshed {
-		b.samples.outputAndRemove(key)
+func (b *Bytetrace) Detach() error {
+	if err := b.ring.Close(); err != nil {
+		return err
 	}
+
+	return b.objs.Close()
 }
