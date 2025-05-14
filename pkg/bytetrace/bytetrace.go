@@ -2,12 +2,16 @@ package bytetrace
 
 import (
 	"bytes"
+	"bytetrace/pkg/dropreason"
+	"bytetrace/pkg/utils"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
+	"github.com/olekukonko/tablewriter"
 )
 
 type Bytetrace struct {
@@ -15,6 +19,7 @@ type Bytetrace struct {
 	link   link.Link
 	ring   *ringbuf.Reader
 	option tracepointOption
+	table  *tablewriter.Table
 }
 
 func New(opt Option) (*Bytetrace, error) {
@@ -26,6 +31,7 @@ func New(opt Option) (*Bytetrace, error) {
 	}
 
 	b.option = opt.toTracepointOption()
+	b.table = tablewriter.NewWriter(os.Stdout)
 
 	return b, nil
 }
@@ -73,9 +79,24 @@ func (b *Bytetrace) Poll() error {
 }
 
 func (b *Bytetrace) onEvent(ev tracepointEvent) {
-	key := ev.SkbPtr
-	reason := ev.Reason
-	fmt.Printf("%v %v\n", key, reason)
+	b.table.ClearRows()
+	b.table.SetHeader([]string{
+		"Reason",
+		"Source",
+		"Destination",
+		"Protocol",
+		"SPort",
+		"DPort",
+	})
+	b.table.Append([]string{
+		dropreason.Lookup(int(ev.Reason)),
+		utils.IntToIP(ev.Saddr).String(),
+		utils.IntToIP(ev.Daddr).String(),
+		fmt.Sprintf("%d", ev.Proto),
+		fmt.Sprintf("%d", ev.Sport),
+		fmt.Sprintf("%d", ev.Dport),
+	})
+	b.table.Render()
 }
 
 func (b *Bytetrace) Detach() error {
