@@ -92,7 +92,7 @@ func (b *Bytetrace) onEvent(ev tracepointEvent) {
 	})
 	b.table.Append([]string{
 		dropreason.Lookup(ev.Reason),
-		kallsyms.Lookup(0xffffffffa99d6230),
+		kallsyms.Lookup(ev.Location),
 		IntToIP(ev.Saddr).String(),
 		IntToIP(ev.Daddr).String(),
 		fmt.Sprintf("%d", ev.Proto),

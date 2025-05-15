@@ -20,7 +20,7 @@ func Lookup(pc uint64) string {
 	defer f.Close()
 
 	symbol := "unknown"
-	min_delta := uint64(math.MaxUint64)
+	minDelta := uint64(math.MaxUint64)
 
 	r := newReader(f)
 	for r.Line() {
@@ -36,8 +36,8 @@ func Lookup(pc uint64) string {
 		}
 
 		delta := pc - sppc
-		if delta < min_delta {
-			min_delta = delta
+		if delta < minDelta {
+			minDelta = delta
 			r.Word()
 			r.Word()
 			symbol = r.Text()
