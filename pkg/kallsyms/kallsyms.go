@@ -38,8 +38,10 @@ func Lookup(pc uint64) string {
 		delta := pc - sppc
 		if delta < minDelta {
 			minDelta = delta
+
 			r.Word()
 			r.Word()
+
 			symbol = r.Text()
 		}
 	}
