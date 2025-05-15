@@ -8,7 +8,7 @@ go mod tidy
 
 cd $home/pkg/bytetrace/
 
-bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+bpftool btf dump file /sys/kernel/btf/vmlinux format c > C/vmlinux.h
 
 go get github.com/cilium/ebpf/cmd/bpf2go
 

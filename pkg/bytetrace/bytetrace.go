@@ -82,22 +82,22 @@ func (b *Bytetrace) Poll() error {
 func (b *Bytetrace) onEvent(ev tracepointEvent) {
 	b.table.ClearRows()
 	b.table.SetHeader([]string{
-		"Reason",
-		"Location",
 		"Source",
 		"Destination",
 		"Protocol",
 		"SPort",
 		"DPort",
+		"Reason",
+		"Location",
 	})
 	b.table.Append([]string{
-		dropreason.Lookup(ev.Reason),
-		kallsyms.Lookup(ev.Location),
 		IntToIP(ev.Saddr).String(),
 		IntToIP(ev.Daddr).String(),
 		fmt.Sprintf("%d", ev.Proto),
 		fmt.Sprintf("%d", ev.Sport),
 		fmt.Sprintf("%d", ev.Dport),
+		dropreason.Lookup(ev.Reason),
+		kallsyms.Lookup(ev.Location),
 	})
 	b.table.Render()
 }
