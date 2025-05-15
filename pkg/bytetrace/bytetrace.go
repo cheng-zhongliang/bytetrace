@@ -3,7 +3,8 @@ package bytetrace
 import (
 	"bytes"
 	"bytetrace/pkg/dropreason"
-	"bytetrace/pkg/utils"
+	"bytetrace/pkg/kallsyms"
+	. "bytetrace/pkg/utils"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -82,6 +83,7 @@ func (b *Bytetrace) onEvent(ev tracepointEvent) {
 	b.table.ClearRows()
 	b.table.SetHeader([]string{
 		"Reason",
+		"Location",
 		"Source",
 		"Destination",
 		"Protocol",
@@ -89,9 +91,10 @@ func (b *Bytetrace) onEvent(ev tracepointEvent) {
 		"DPort",
 	})
 	b.table.Append([]string{
-		dropreason.Lookup(int(ev.Reason)),
-		utils.IntToIP(ev.Saddr).String(),
-		utils.IntToIP(ev.Daddr).String(),
+		dropreason.Lookup(ev.Reason),
+		kallsyms.Lookup(0xffffffffa99d6230),
+		IntToIP(ev.Saddr).String(),
+		IntToIP(ev.Daddr).String(),
 		fmt.Sprintf("%d", ev.Proto),
 		fmt.Sprintf("%d", ev.Sport),
 		fmt.Sprintf("%d", ev.Dport),

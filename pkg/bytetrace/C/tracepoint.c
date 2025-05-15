@@ -8,6 +8,7 @@
 #define ETH_P_IP 0x0800
 #define ETH_P_IPV6 0x86DD
 
+#define get_drop_location(ctx) *(u64*)(void*)((u64*)(ctx) + 1)
 #define get_drop_reason(ctx) *(int*)(void*)((u64*)(ctx) + 2)
 
 struct option {
@@ -20,6 +21,7 @@ struct option {
 
 struct event {
     u16 reason;
+    u64 location;
     u8 proto;
     u32 saddr;
     u32 daddr;
@@ -29,6 +31,7 @@ struct event {
 
 struct skb_context {
     u16 reason;
+    u64 location;
     struct ethhdr eth;
     struct iphdr ip;
 };
@@ -97,11 +100,9 @@ static __always_inline int filter(struct skb_context* skb_ctx)
     if(opt->proto && opt->proto != skb_ctx->ip.protocol) {
         return -1;
     }
-
     if(opt->saddr && opt->saddr != skb_ctx->ip.saddr) {
         return -1;
     }
-
     if(opt->daddr && opt->daddr != skb_ctx->ip.daddr) {
         return -1;
     }
@@ -112,8 +113,9 @@ static __always_inline int filter(struct skb_context* skb_ctx)
 static __always_inline int submit(struct skb_context* skb_ctx)
 {
     struct event e;
-
+    
     e.reason = skb_ctx->reason;
+    e.location = skb_ctx->location;
     e.proto = skb_ctx->ip.protocol;
     e.saddr = skb_ctx->ip.saddr;
     e.daddr = skb_ctx->ip.daddr;
@@ -128,31 +130,23 @@ static __always_inline int trace(void* ctx, struct sk_buff* skb, struct skb_cont
     if(parse(skb, skb_ctx)) {
         return 0;
     }
-
     if(filter(skb_ctx)) {
         return 0;
     }
-
     return submit(skb_ctx);
 }
 
 SEC("tp_btf/kfree_skb")
 int BPF_PROG(kfree_skb, struct sk_buff* skb)
 {
-    int reason;
     struct skb_context skb_ctx;
 
-    if(bpf_core_type_exists(enum skb_drop_reason)) {
-        reason = get_drop_reason(ctx);
-    } else {
+    skb_ctx.reason = get_drop_reason(ctx);
+    skb_ctx.location = get_drop_location(ctx);
+
+    if(skb_ctx.reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
         return 0;
     }
-
-    if(reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
-        return 0;
-    }
-
-    skb_ctx.reason = reason;
 
     return trace(ctx, skb, &skb_ctx);
 }

@@ -30,6 +30,6 @@ func init() {
 	}
 }
 
-func Lookup(code int) string {
+func Lookup(code uint16) string {
 	return reasons[code]
 }
