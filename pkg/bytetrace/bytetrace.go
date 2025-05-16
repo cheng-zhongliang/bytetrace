@@ -87,8 +87,8 @@ func (b *Bytetrace) onEvent(ev tracepointEvent) {
 		"Protocol",
 		"SPort",
 		"DPort",
-		"Reason",
 		"Location",
+		"Reason",
 	})
 	b.table.Append([]string{
 		IntToIP(ev.Saddr).String(),
@@ -96,8 +96,8 @@ func (b *Bytetrace) onEvent(ev tracepointEvent) {
 		fmt.Sprintf("%d", ev.Proto),
 		fmt.Sprintf("%d", ev.Sport),
 		fmt.Sprintf("%d", ev.Dport),
-		dropreason.Lookup(ev.Reason),
 		kallsyms.Lookup(ev.Location),
+		dropreason.Lookup(ev.Reason),
 	})
 	b.table.Render()
 }
