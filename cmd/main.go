@@ -13,7 +13,7 @@ var opt bytetrace.Option
 
 var cmd = &cobra.Command{
 	Use:                   "bytetrace [flags] <args>",
-	Long:                  "Light-weight Dynamic Tracer for Linux Network Stack",
+	Long:                  "Light-weight Dynamic Tracer for Linux Packet Drop",
 	DisableFlagsInUseLine: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return Do(opt)
