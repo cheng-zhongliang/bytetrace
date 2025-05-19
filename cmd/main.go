@@ -40,7 +40,7 @@ func Do(opt bytetrace.Option) (err error) {
 	}
 
 	stopper := make(chan os.Signal, 1)
-	signal.Notify(stopper, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
 
 	go func() error {
 		<-stopper
