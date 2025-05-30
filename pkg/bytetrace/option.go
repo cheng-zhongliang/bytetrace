@@ -16,6 +16,7 @@ type Option struct {
 	ValidReason bool
 	BTFPath     string
 	Color       bool
+	Interface   string
 }
 
 func (o *Option) toTracepointOption() *tracepointOption {

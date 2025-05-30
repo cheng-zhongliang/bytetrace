@@ -30,8 +30,9 @@ func init() {
 	cmd.Flags().BoolVarP(&opt.Stack, "stack", "k", false, "stack trace")
 	cmd.Flags().BoolVarP(&opt.Verbose, "verbose", "v", false, "verbose output")
 	cmd.Flags().BoolVarP(&opt.ValidReason, "valid-reason", "r", false, "valid drop reason")
-	cmd.Flags().StringVarP(&opt.BTFPath, "btf", "b", "", "BTF file path (optional)")
+	cmd.Flags().StringVarP(&opt.BTFPath, "btf", "b", "", "BTF file path")
 	cmd.Flags().BoolVarP(&opt.Color, "color", "c", false, "output with color")
+	cmd.Flags().StringVarP(&opt.Interface, "interface", "i", "", "interface name")
 }
 
 func Do(opt bytetrace.Option) (err error) {
