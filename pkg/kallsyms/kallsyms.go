@@ -1,28 +1,40 @@
 package kallsyms
 
 import (
+	"bytes"
 	"math"
 	"os"
 	"strconv"
 )
 
-var cache = make(map[uint64]string)
+type Kallsyms struct {
+	caches  map[uint64]string
+	content []byte
+}
 
-func Lookup(pc uint64) string {
-	if symbol, ok := cache[pc]; ok {
+func New() (*Kallsyms, error) {
+	content, err := os.ReadFile("/proc/kallsyms")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Kallsyms{
+		caches:  make(map[uint64]string),
+		content: content,
+	}, nil
+}
+
+func (k *Kallsyms) Lookup(pc uint64) string {
+	if symbol, ok := k.caches[pc]; ok {
 		return symbol
 	}
 
-	f, err := os.Open("/proc/kallsyms")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
+	br := bytes.NewReader(k.content)
 
 	symbol := "unknown"
 	minDelta := uint64(math.MaxUint64)
 
-	r := newReader(f)
+	r := newReader(br)
 	for r.Line() {
 		r.Word()
 
@@ -49,7 +61,7 @@ func Lookup(pc uint64) string {
 		panic(r.err)
 	}
 
-	cache[pc] = symbol
+	k.caches[pc] = symbol
 
 	return symbol
 }

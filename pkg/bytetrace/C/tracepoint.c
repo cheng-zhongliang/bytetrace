@@ -7,9 +7,30 @@
 
 #define ETH_P_IP 0x0800
 #define ETH_P_IPV6 0x86DD
+#define ETH_P_8021Q 0x8100
+#define ETH_P_8021AD 0x88A8
 
-#define get_drop_location(ctx) *(u64*)(void*)((u64*)(ctx) + 1)
-#define get_drop_reason(ctx) *(int*)(void*)((u64*)(ctx) + 2)
+typedef void* stack_trace_t[64];
+
+static inline bool eth_type_vlan(u16 ethertype)
+{
+    switch(ethertype) {
+    case bpf_htons(ETH_P_8021Q):
+    case bpf_htons(ETH_P_8021AD): return true;
+    default: return false;
+    }
+}
+
+static __always_inline int safe_strncmp(u8* s1, u8* s2, int n)
+{
+    for(int i = 0; i < n; i++) {
+        if(s1[i] != s2[i])
+            return s1[i] - s2[i];
+        if(s1[i] == '\0' || s2[i] == '\0')
+            break;
+    }
+    return 0;
+}
 
 struct option {
     u8 proto;
@@ -17,6 +38,10 @@ struct option {
     u32 daddr;
     u16 sport;
     u16 dport;
+    bool stack;
+    bool verbose;
+    bool valid_reason;
+    u8 dev_name[16];
 };
 
 struct event {
@@ -27,13 +52,20 @@ struct event {
     u32 daddr;
     u16 sport;
     u16 dport;
+    u8 dev_name[16];
+    u32 stack_id;
 };
 
-struct skb_context {
+struct trace_context {
     u16 reason;
+    u32 stack_id;
     u64 location;
     struct ethhdr eth;
     struct iphdr ip;
+    struct net_device* dev;
+    struct option* opt;
+    struct trace_event_raw_kfree_skb* raw_ctx;
+    struct sk_buff* skb;
 };
 
 struct {
@@ -45,110 +77,155 @@ struct {
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __uint(max_entries, 1 << 24);
     __type(value, struct event);
+    __uint(max_entries, 1 << 24);
 } events SEC(".maps");
 
-static __always_inline int parse_ipv4(struct sk_buff* skb, struct skb_context* skb_ctx)
+struct {
+    __uint(type, BPF_MAP_TYPE_STACK_TRACE);
+    __type(key, u32);
+    __type(value, stack_trace_t);
+    __uint(max_entries, 0xfff);
+} stacks SEC(".maps");
+
+static __always_inline int parse_ipv4(struct trace_context* ctx)
 {
-    unsigned char* head = BPF_CORE_READ(skb, head);
-    u16 network_header = BPF_CORE_READ(skb, network_header);
-    bpf_probe_read(&skb_ctx->ip, sizeof(struct iphdr), head + network_header);
+    struct sk_buff* skb = ctx->skb;
+    struct option* opt = ctx->opt;
+    struct iphdr* ip = &ctx->ip;
+
+    void* head;
+    u16 network_header;
+
+    head = BPF_CORE_READ(skb, head);
+    network_header = BPF_CORE_READ(skb, network_header);
+
+    bpf_probe_read(ip, sizeof(*ip), head + network_header);
+
+    if(opt->proto && opt->proto != ip->protocol) {
+        return -1;
+    }
+    if(opt->saddr && opt->saddr != ip->saddr) {
+        return -1;
+    }
+    if(opt->daddr && opt->daddr != ip->daddr) {
+        return -1;
+    }
+
     return 0;
 }
 
-static __always_inline int parse_l4(struct sk_buff* skb, struct skb_context* skb_ctx)
+static __always_inline int parse_l3(struct trace_context* ctx)
 {
-    return 0;
-}
-
-static __always_inline int parse_l3(struct sk_buff* skb, struct skb_context* skb_ctx)
-{
-    switch(bpf_ntohs(skb_ctx->eth.h_proto)) {
-    case ETH_P_IP: {
-        if(parse_ipv4(skb, skb_ctx)) {
-            return -1;
-        }
-        break;
-    };
+    switch(ctx->eth.h_proto) {
+    case bpf_htons(ETH_P_IP): return parse_ipv4(ctx);
+    case bpf_htons(ETH_P_IPV6): return 0;
     default: return -1;
     }
-    return parse_l4(skb, skb_ctx);
 }
 
-static __always_inline int parse_l2(struct sk_buff* skb, struct skb_context* skb_ctx)
+static __always_inline int parse_l2(struct trace_context* ctx)
 {
-    unsigned char* head = BPF_CORE_READ(skb, head);
-    u16 mac_header = BPF_CORE_READ(skb, mac_header);
-    bpf_probe_read(&skb_ctx->eth, sizeof(struct ethhdr), head + mac_header);
-    return parse_l3(skb, skb_ctx);
+    struct sk_buff* skb = ctx->skb;
+    struct ethhdr* eth = &ctx->eth;
+
+    u16 proto;
+    u16 mac_header;
+    void* head;
+
+    proto = BPF_CORE_READ(skb, protocol);
+    if(eth_type_vlan(proto)) {
+        return 0;
+    }
+
+    head = BPF_CORE_READ(skb, head);
+    mac_header = BPF_CORE_READ(skb, mac_header);
+    bpf_probe_read(&ctx->eth, sizeof(ctx->eth), head + mac_header);
+
+    return parse_l3(ctx);
 }
 
-static __always_inline int parse(struct sk_buff* skb, struct skb_context* skb_ctx)
+static __always_inline int parse(struct trace_context* ctx)
 {
-    return parse_l2(skb, skb_ctx);
+    struct sk_buff* skb = ctx->skb;
+    struct option* opt = ctx->opt;
+    int reason = ctx->reason;
+
+    if(opt->valid_reason && reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
+        return 0;
+    }
+
+    if(opt->dev_name[0]) {
+        ctx->dev = BPF_CORE_READ(skb, dev);
+        u8 name[16];
+        bpf_probe_read_str(name, sizeof(name), ctx->dev->name);
+        if(safe_strncmp(name, opt->dev_name, sizeof(name))) {
+            return 0;
+        }
+    }
+
+    return parse_l2(ctx);
 }
 
-static __always_inline int filter(struct skb_context* skb_ctx)
+static __always_inline int submit(struct trace_context* ctx)
 {
-    int _key = 0;
-    struct option* opt = bpf_map_lookup_elem(&options, &_key);
-    if(!opt) {
-        return -1;
+    struct event* e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
+    if(!e) {
+        return 0;
     }
 
-    if(opt->proto && opt->proto != skb_ctx->ip.protocol) {
-        return -1;
-    }
-    if(opt->saddr && opt->saddr != skb_ctx->ip.saddr) {
-        return -1;
-    }
-    if(opt->daddr && opt->daddr != skb_ctx->ip.daddr) {
-        return -1;
-    }
+    e->reason = ctx->reason;
+    e->location = ctx->location;
+    e->proto = ctx->ip.protocol;
+    e->saddr = ctx->ip.saddr;
+    e->daddr = ctx->ip.daddr;
+    e->stack_id = ctx->stack_id;
+    bpf_probe_read_str(e->dev_name, sizeof(e->dev_name), ctx->dev->name);
+
+    bpf_ringbuf_submit(e, 0);
 
     return 0;
 }
 
-static __always_inline int submit(struct skb_context* skb_ctx)
+static __always_inline int trace(struct trace_context* ctx)
 {
-    struct event e;
-    
-    e.reason = skb_ctx->reason;
-    e.location = skb_ctx->location;
-    e.proto = skb_ctx->ip.protocol;
-    e.saddr = skb_ctx->ip.saddr;
-    e.daddr = skb_ctx->ip.daddr;
-    e.sport = 0;
-    e.dport = 0;
+    struct sk_buff* skb = ctx->skb;
+    struct option* opt = ctx->opt;
 
-    return bpf_ringbuf_output(&events, &e, sizeof(e), 0);
+    if(parse(ctx)) {
+        return 0;
+    }
+
+    if(opt->verbose && !ctx->dev) {
+        ctx->dev = BPF_CORE_READ(skb, dev);
+    }
+
+    if (opt->stack) {
+        ctx->stack_id = bpf_get_stackid(ctx->raw_ctx, &stacks, 0);
+    }
+
+    return submit(ctx);
 }
 
-static __always_inline int trace(void* ctx, struct sk_buff* skb, struct skb_context* skb_ctx)
+SEC("tracepoint/skb/kfree_skb")
+int trace_skb(struct trace_event_raw_kfree_skb* raw_ctx)
 {
-    if(parse(skb, skb_ctx)) {
-        return 0;
-    }
-    if(filter(skb_ctx)) {
-        return 0;
-    }
-    return submit(skb_ctx);
-}
+    struct trace_context ctx = { 0 };
+    struct option* opt;
 
-SEC("tp_btf/kfree_skb")
-int BPF_PROG(kfree_skb, struct sk_buff* skb)
-{
-    struct skb_context skb_ctx;
-
-    skb_ctx.reason = get_drop_reason(ctx);
-    skb_ctx.location = get_drop_location(ctx);
-
-    if(skb_ctx.reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
+    opt = bpf_map_lookup_elem(&options, &(u32){ 0 });
+    if(!opt) {
         return 0;
     }
 
-    return trace(ctx, skb, &skb_ctx);
+    ctx.opt = opt;
+    ctx.raw_ctx = raw_ctx;
+    ctx.skb = raw_ctx->skbaddr;
+    ctx.reason = raw_ctx->reason;
+    ctx.location = (u64)raw_ctx->location;
+
+    // return always 0
+    return trace(&ctx);
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

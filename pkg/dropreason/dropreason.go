@@ -6,12 +6,15 @@ import (
 	"strconv"
 )
 
-var reasons [256]string
+type DropReason struct {
+	reasons [256]string
+}
 
-func init() {
+func New() (*DropReason, error) {
+	dr := &DropReason{}
 	content, err := os.ReadFile("/sys/kernel/debug/tracing/events/skb/kfree_skb/format")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	re := regexp.MustCompile(`\{\s*(\d+),\s*"([^"]+)"\s*\}`)
@@ -22,14 +25,16 @@ func init() {
 		if len(match) == 3 {
 			index, err := strconv.Atoi(match[1])
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			reason := match[2]
-			reasons[index] = reason
+			dr.reasons[index] = reason
 		}
 	}
+
+	return dr, nil
 }
 
-func Lookup(code uint16) string {
-	return reasons[code]
+func (dr *DropReason) Lookup(reason uint16) string {
+	return dr.reasons[reason]
 }

@@ -9,36 +9,72 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/olekukonko/tablewriter"
 )
 
 type Bytetrace struct {
-	objs   tracepointObjects
-	link   link.Link
-	ring   *ringbuf.Reader
-	option tracepointOption
-	table  *tablewriter.Table
+	objs  tracepointObjects
+	link  link.Link
+	ring  *ringbuf.Reader
+	opt   Option
+	table *tablewriter.Table
+	dr    dropResolver
+	sf    symbolFinder
+	sb    *strings.Builder
+}
+
+type dropResolver interface {
+	Lookup(reason uint16) string
+}
+
+type symbolFinder interface {
+	Lookup(pc uint64) string
 }
 
 func New(opt Option) (*Bytetrace, error) {
-	b := new(Bytetrace)
+	b := &Bytetrace{}
 
-	err := loadTracepointObjects(&b.objs, nil)
+	opts := &ebpf.CollectionOptions{}
+
+	if opt.BTFPath != "" {
+		btfSpec, err := LoadBTF(opt.BTFPath)
+		if err != nil {
+			return nil, err
+		}
+		opts.Programs.KernelTypes = btfSpec
+	}
+
+	dr, err := dropreason.New()
 	if err != nil {
 		return nil, err
 	}
 
-	b.option = opt.toTracepointOption()
+	sf, err := kallsyms.New()
+	if err != nil {
+		return nil, err
+	}
+
+	err = loadTracepointObjects(&b.objs, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	b.dr = dr
+	b.sf = sf
+	b.opt = opt
 	b.table = tablewriter.NewWriter(os.Stdout)
+	b.sb = &strings.Builder{}
 
 	return b, nil
 }
 
 func (b *Bytetrace) Attach() error {
-	err := b.objs.tracepointMaps.Options.Put(uint32(0), &b.option)
+	err := b.objs.tracepointMaps.Options.Put(uint32(0), b.opt.toTracepointOption())
 	if err != nil {
 		return err
 	}
@@ -48,9 +84,7 @@ func (b *Bytetrace) Attach() error {
 		return err
 	}
 
-	b.link, err = link.AttachTracing(link.TracingOptions{
-		Program: b.objs.tracepointPrograms.KfreeSkb,
-	})
+	b.link, err = link.Tracepoint("skb", "kfree_skb", b.objs.tracepointPrograms.TraceSkb, nil)
 	if err != nil {
 		return err
 	}
@@ -81,25 +115,76 @@ func (b *Bytetrace) Poll() error {
 
 func (b *Bytetrace) onEvent(ev tracepointEvent) {
 	b.table.ClearRows()
-	b.table.SetHeader([]string{
-		"Source",
-		"Destination",
-		"Protocol",
-		"SPort",
-		"DPort",
-		"Location",
-		"Reason",
-	})
-	b.table.Append([]string{
-		IntToIP(ev.Saddr).String(),
-		IntToIP(ev.Daddr).String(),
-		fmt.Sprintf("%d", ev.Proto),
-		fmt.Sprintf("%d", ev.Sport),
-		fmt.Sprintf("%d", ev.Dport),
-		kallsyms.Lookup(ev.Location),
-		dropreason.Lookup(ev.Reason),
-	})
+
+	hs := make([]string, 0)
+	if b.opt.Verbose {
+		hs = append(hs, "Interface")
+	}
+	hs = append(hs, "Source")
+	hs = append(hs, "Destination")
+	hs = append(hs, "Protocol")
+	hs = append(hs, "SPort")
+	hs = append(hs, "DPort")
+	hs = append(hs, "Location")
+	hs = append(hs, "Reason")
+	b.table.SetHeader(hs)
+
+	if b.opt.Color {
+		cs := make([]tablewriter.Colors, 0)
+		if b.opt.Verbose {
+			cs = append(cs, tablewriter.Colors{tablewriter.BgCyanColor})
+		}
+		cs = append(cs, tablewriter.Colors{tablewriter.BgBlueColor})
+		cs = append(cs, tablewriter.Colors{tablewriter.BgBlueColor})
+		cs = append(cs, tablewriter.Colors{tablewriter.BgGreenColor})
+		cs = append(cs, tablewriter.Colors{tablewriter.BgYellowColor})
+		cs = append(cs, tablewriter.Colors{tablewriter.BgYellowColor})
+		cs = append(cs, tablewriter.Colors{tablewriter.BgMagentaColor})
+		cs = append(cs, tablewriter.Colors{tablewriter.BgRedColor})
+		b.table.SetHeaderColor(cs...)
+	}
+
+	rows := make([]string, 0)
+	if b.opt.Verbose {
+		rows = append(rows, string(ev.DevName[:]))
+	}
+	rows = append(rows, IntToIP(ev.Saddr).String())
+	rows = append(rows, IntToIP(ev.Daddr).String())
+	rows = append(rows, fmt.Sprintf("%d", ev.Proto))
+	rows = append(rows, fmt.Sprintf("%d", ev.Sport))
+	rows = append(rows, fmt.Sprintf("%d", ev.Dport))
+	rows = append(rows, b.sf.Lookup(ev.Location))
+	rows = append(rows, b.dr.Lookup(ev.Reason))
+	b.table.Append(rows)
+
 	b.table.Render()
+
+	if b.opt.Stack {
+		b.outputCallStack(ev.StackId)
+	}
+}
+
+func (b *Bytetrace) outputCallStack(StackId uint32) {
+	stacks := make([]uint64, 64)
+	err := b.objs.tracepointMaps.Stacks.Lookup(StackId, stacks)
+	if err != nil {
+		return
+	}
+
+	b.sb.Reset()
+	fmt.Fprintf(b.sb, "Call Stack:\n")
+	for _, pc := range stacks {
+		if pc == 0 {
+			continue
+		}
+		symbol := b.sf.Lookup(pc)
+		if symbol == "" {
+			break
+		}
+		fmt.Fprintf(b.sb, "    -> %s\n", symbol)
+	}
+	fmt.Fprintf(b.sb, "\n")
+	fmt.Print(b.sb.String())
 }
 
 func (b *Bytetrace) Detach() error {

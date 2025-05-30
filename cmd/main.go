@@ -27,6 +27,11 @@ func init() {
 	cmd.Flags().IPVarP(&opt.Daddr, "daddr", "d", nil, "destination address")
 	cmd.Flags().Uint16VarP(&opt.Sport, "sport", "S", 0, "source port")
 	cmd.Flags().Uint16VarP(&opt.Dport, "dport", "D", 0, "destination port")
+	cmd.Flags().BoolVarP(&opt.Stack, "stack", "k", false, "stack trace")
+	cmd.Flags().BoolVarP(&opt.Verbose, "verbose", "v", false, "verbose output")
+	cmd.Flags().BoolVarP(&opt.ValidReason, "valid-reason", "r", false, "valid drop reason")
+	cmd.Flags().StringVarP(&opt.BTFPath, "btf", "b", "", "BTF file path (optional)")
+	cmd.Flags().BoolVarP(&opt.Color, "color", "c", false, "output with color")
 }
 
 func Do(opt bytetrace.Option) (err error) {
