@@ -200,7 +200,7 @@ static __always_inline int trace(struct trace_context* ctx)
         ctx->dev = BPF_CORE_READ(skb, dev);
     }
 
-    if (opt->stack) {
+    if(opt->stack) {
         ctx->stack_id = bpf_get_stackid(ctx->raw_ctx, &stacks, 0);
     }
 
