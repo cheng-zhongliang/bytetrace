@@ -110,11 +110,11 @@ func (b *Bytetrace) Poll() error {
 			continue
 		}
 
-		b.onEvent(event)
+		b.output(event)
 	}
 }
 
-func (b *Bytetrace) onEvent(ev tracepointEvent) {
+func (b *Bytetrace) output(ev tracepointEvent) {
 	b.table.ClearRows()
 
 	hs := make([]string, 0)
