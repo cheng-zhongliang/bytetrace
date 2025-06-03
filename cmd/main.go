@@ -40,6 +40,7 @@ func Do(opt bytetrace.Option) (err error) {
 	if err != nil {
 		return err
 	}
+	defer b.Close()
 
 	if err := b.Attach(); err != nil {
 		return err

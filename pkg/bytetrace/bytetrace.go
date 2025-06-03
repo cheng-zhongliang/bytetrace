@@ -190,5 +190,9 @@ func (b *Bytetrace) Detach() error {
 		return err
 	}
 
+	return b.link.Close()
+}
+
+func (b *Bytetrace) Close() error {
 	return b.objs.Close()
 }
