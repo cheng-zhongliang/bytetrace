@@ -133,7 +133,7 @@ static __always_inline int parse_l2(struct trace_context* ctx)
     ctx->dev = BPF_CORE_READ(skb, dev);
     if(opt->dev_name[0]) {
         u8 name[16];
-        bpf_probe_read_str(name, sizeof(name), ctx->dev->name);
+        bpf_probe_read_kernel_str(name, sizeof(name), ctx->dev->name);
         if(safe_strncmp(name, opt->dev_name, sizeof(name))) {
             return -1;
         }
@@ -177,7 +177,7 @@ static __always_inline int submit(struct trace_context* ctx)
     e->saddr = ctx->ip.saddr;
     e->daddr = ctx->ip.daddr;
     e->stack_id = ctx->stack_id;
-    bpf_probe_read_str(e->dev_name, sizeof(e->dev_name), ctx->dev->name);
+    bpf_probe_read_kernel_str(e->dev_name, sizeof(e->dev_name), ctx->dev->name);
 
     bpf_ringbuf_submit(e, 0);
 
