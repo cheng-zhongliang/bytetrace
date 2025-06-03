@@ -128,18 +128,24 @@ static __always_inline int parse_l2(struct trace_context* ctx)
 {
     struct sk_buff* skb = ctx->skb;
     struct ethhdr* eth = &ctx->eth;
+    struct option* opt = ctx->opt;
 
-    u16 proto;
-    u16 mac_header;
-    void* head;
+    ctx->dev = BPF_CORE_READ(skb, dev);
+    if(opt->dev_name[0]) {
+        u8 name[16];
+        bpf_probe_read_str(name, sizeof(name), ctx->dev->name);
+        if(safe_strncmp(name, opt->dev_name, sizeof(name))) {
+            return -1;
+        }
+    }
 
-    proto = BPF_CORE_READ(skb, protocol);
+    u16 proto = BPF_CORE_READ(skb, protocol);
     if(eth_type_vlan(proto)) {
         return 0;
     }
 
-    head = BPF_CORE_READ(skb, head);
-    mac_header = BPF_CORE_READ(skb, mac_header);
+    void* head = BPF_CORE_READ(skb, head);
+    u16 mac_header = BPF_CORE_READ(skb, mac_header);
     bpf_probe_read(&ctx->eth, sizeof(ctx->eth), head + mac_header);
 
     return parse_l3(ctx);
@@ -153,15 +159,6 @@ static __always_inline int parse(struct trace_context* ctx)
 
     if(opt->valid_reason && reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
         return 0;
-    }
-
-    if(opt->dev_name[0]) {
-        ctx->dev = BPF_CORE_READ(skb, dev);
-        u8 name[16];
-        bpf_probe_read_str(name, sizeof(name), ctx->dev->name);
-        if(safe_strncmp(name, opt->dev_name, sizeof(name))) {
-            return 0;
-        }
     }
 
     return parse_l2(ctx);
@@ -196,10 +193,6 @@ static __always_inline int trace(struct trace_context* ctx)
         return 0;
     }
 
-    if(opt->verbose && !ctx->dev) {
-        ctx->dev = BPF_CORE_READ(skb, dev);
-    }
-
     if(opt->stack) {
         ctx->stack_id = bpf_get_stackid(ctx->raw_ctx, &stacks, 0);
     }
@@ -224,7 +217,6 @@ int trace_skb(struct trace_event_raw_kfree_skb* raw_ctx)
     ctx.reason = raw_ctx->reason;
     ctx.location = (u64)raw_ctx->location;
 
-    // return always 0
     return trace(&ctx);
 }
 

@@ -29,5 +29,10 @@ func (o *Option) toTracepointOption() *tracepointOption {
 		Stack:       o.Stack,
 		Verbose:     o.Verbose,
 		ValidReason: o.ValidReason,
+		DevName: func(s string) [16]uint8 {
+			var arr [16]uint8
+			copy(arr[:], s)
+			return arr
+		}(o.Interface),
 	}
 }

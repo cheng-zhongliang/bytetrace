@@ -12,6 +12,7 @@ type DropReason struct {
 
 func New() (*DropReason, error) {
 	dr := &DropReason{}
+
 	content, err := os.ReadFile("/sys/kernel/debug/tracing/events/skb/kfree_skb/format")
 	if err != nil {
 		return nil, err

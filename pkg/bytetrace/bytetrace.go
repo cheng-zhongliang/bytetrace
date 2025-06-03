@@ -18,14 +18,15 @@ import (
 )
 
 type Bytetrace struct {
-	objs  tracepointObjects
-	link  link.Link
-	ring  *ringbuf.Reader
-	opt   Option
-	table *tablewriter.Table
-	dr    dropResolver
-	sf    symbolFinder
-	sb    *strings.Builder
+	objs   tracepointObjects
+	link   link.Link
+	ring   *ringbuf.Reader
+	opt    Option
+	table  *tablewriter.Table
+	dr     dropResolver
+	sf     symbolFinder
+	sb     *strings.Builder
+	stacks []uint64
 }
 
 type dropResolver interface {
@@ -38,7 +39,6 @@ type symbolFinder interface {
 
 func New(opt Option) (*Bytetrace, error) {
 	b := &Bytetrace{}
-
 	opts := &ebpf.CollectionOptions{}
 
 	if opt.BTFPath != "" {
@@ -69,6 +69,7 @@ func New(opt Option) (*Bytetrace, error) {
 	b.opt = opt
 	b.table = tablewriter.NewWriter(os.Stdout)
 	b.sb = &strings.Builder{}
+	b.stacks = make([]uint64, 64)
 
 	return b, nil
 }
@@ -165,15 +166,13 @@ func (b *Bytetrace) onEvent(ev tracepointEvent) {
 }
 
 func (b *Bytetrace) outputCallStack(StackId uint32) {
-	stacks := make([]uint64, 64)
-	err := b.objs.tracepointMaps.Stacks.Lookup(StackId, stacks)
+	err := b.objs.tracepointMaps.Stacks.Lookup(StackId, b.stacks)
 	if err != nil {
 		return
 	}
 
 	b.sb.Reset()
-	fmt.Fprintf(b.sb, "Call Stack:\n")
-	for _, pc := range stacks {
+	for _, pc := range b.stacks {
 		if pc == 0 {
 			continue
 		}
@@ -181,9 +180,8 @@ func (b *Bytetrace) outputCallStack(StackId uint32) {
 		if symbol == "" {
 			break
 		}
-		fmt.Fprintf(b.sb, "    -> %s\n", symbol)
+		fmt.Fprintf(b.sb, " -> %s\n", symbol)
 	}
-	fmt.Fprintf(b.sb, "\n")
 	fmt.Print(b.sb.String())
 }
 
