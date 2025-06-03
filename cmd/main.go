@@ -18,6 +18,7 @@ var cmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return Do(opt)
 	},
+	Version: "0.1.0",
 }
 
 func init() {
