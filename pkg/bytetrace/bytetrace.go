@@ -2,45 +2,32 @@ package bytetrace
 
 import (
 	"bytes"
-	"bytetrace/pkg/dropreason"
-	"bytetrace/pkg/kallsyms"
-	. "bytetrace/pkg/utils"
+
 	"encoding/binary"
 	"errors"
-	"fmt"
-	"os"
-	"strings"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
-	"github.com/olekukonko/tablewriter"
 )
 
 type Bytetrace struct {
-	objs   tracepointObjects
-	link   link.Link
-	ring   *ringbuf.Reader
-	opt    Option
-	table  *tablewriter.Table
-	dr     dropResolver
-	sf     symbolFinder
-	sb     *strings.Builder
-	stacks []uint64
+	objs    tracepointObjects
+	link    link.Link
+	ring    *ringbuf.Reader
+	opt     Option
+	stacks  []uint64
+	console console
 }
 
-type dropResolver interface {
-	Lookup(reason uint16) string
-}
-
-type symbolFinder interface {
-	Lookup(pc uint64) string
+type console interface {
+	output(ev *tracepointEvent, stacks []uint64)
 }
 
 func New(opt Option) (*Bytetrace, error) {
-	b := &Bytetrace{}
-	opts := &ebpf.CollectionOptions{}
+	b := &Bytetrace{opt: opt, stacks: make([]uint64, 64)}
 
+	opts := &ebpf.CollectionOptions{}
 	if opt.BTFPath != "" {
 		btfSpec, err := LoadBTF(opt.BTFPath)
 		if err != nil {
@@ -49,27 +36,16 @@ func New(opt Option) (*Bytetrace, error) {
 		opts.Programs.KernelTypes = btfSpec
 	}
 
-	dr, err := dropreason.New()
+	err := loadTracepointObjects(&b.objs, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	sf, err := kallsyms.New()
+	t, err := newTable(opt.Verbose, opt.Color)
 	if err != nil {
 		return nil, err
 	}
-
-	err = loadTracepointObjects(&b.objs, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	b.dr = dr
-	b.sf = sf
-	b.opt = opt
-	b.table = tablewriter.NewWriter(os.Stdout)
-	b.sb = &strings.Builder{}
-	b.stacks = make([]uint64, 64)
+	b.console = t
 
 	return b, nil
 }
@@ -110,79 +86,20 @@ func (b *Bytetrace) Poll() error {
 			continue
 		}
 
-		b.output(event)
+		b.onEvent(&event)
 	}
 }
 
-func (b *Bytetrace) output(ev tracepointEvent) {
-	b.table.ClearRows()
-
-	hs := make([]string, 0)
-	if b.opt.Verbose {
-		hs = append(hs, "Interface")
-	}
-	hs = append(hs, "Source")
-	hs = append(hs, "Destination")
-	hs = append(hs, "Protocol")
-	hs = append(hs, "SPort")
-	hs = append(hs, "DPort")
-	hs = append(hs, "Location")
-	hs = append(hs, "Reason")
-	b.table.SetHeader(hs)
-
-	if b.opt.Color {
-		cs := make([]tablewriter.Colors, 0)
-		if b.opt.Verbose {
-			cs = append(cs, tablewriter.Colors{tablewriter.BgCyanColor})
-		}
-		cs = append(cs, tablewriter.Colors{tablewriter.BgBlueColor})
-		cs = append(cs, tablewriter.Colors{tablewriter.BgBlueColor})
-		cs = append(cs, tablewriter.Colors{tablewriter.BgGreenColor})
-		cs = append(cs, tablewriter.Colors{tablewriter.BgYellowColor})
-		cs = append(cs, tablewriter.Colors{tablewriter.BgYellowColor})
-		cs = append(cs, tablewriter.Colors{tablewriter.BgMagentaColor})
-		cs = append(cs, tablewriter.Colors{tablewriter.BgRedColor})
-		b.table.SetHeaderColor(cs...)
-	}
-
-	rows := make([]string, 0)
-	if b.opt.Verbose {
-		rows = append(rows, string(ev.DevName[:]))
-	}
-	rows = append(rows, IntToIP(ev.Saddr).String())
-	rows = append(rows, IntToIP(ev.Daddr).String())
-	rows = append(rows, fmt.Sprintf("%d", ev.Proto))
-	rows = append(rows, fmt.Sprintf("%d", ev.Sport))
-	rows = append(rows, fmt.Sprintf("%d", ev.Dport))
-	rows = append(rows, b.sf.Lookup(ev.Location))
-	rows = append(rows, b.dr.Lookup(ev.Reason))
-	b.table.Append(rows)
-
-	b.table.Render()
-
+func (b *Bytetrace) onEvent(ev *tracepointEvent) {
 	if b.opt.Stack {
-		b.outputCallStack(ev.StackId)
-	}
-}
-
-func (b *Bytetrace) outputCallStack(StackId uint32) {
-	err := b.objs.tracepointMaps.Stacks.Lookup(StackId, b.stacks)
-	if err != nil {
-		return
-	}
-
-	b.sb.Reset()
-	for _, pc := range b.stacks {
-		if pc == 0 {
-			continue
+		err := b.objs.tracepointMaps.Stacks.Lookup(ev.StackId, &b.stacks)
+		if err != nil {
+			return
 		}
-		symbol := b.sf.Lookup(pc)
-		if symbol == "" {
-			break
-		}
-		fmt.Fprintf(b.sb, " -> %s\n", symbol)
+		b.console.output(ev, b.stacks)
+	} else {
+		b.console.output(ev, nil)
 	}
-	fmt.Print(b.sb.String())
 }
 
 func (b *Bytetrace) Detach() error {
