@@ -158,7 +158,7 @@ static __always_inline int parse(struct trace_context* ctx)
     int reason = ctx->reason;
 
     if(opt->valid_reason && reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
-        return 0;
+        return -1;
     }
 
     return parse_l2(ctx);
