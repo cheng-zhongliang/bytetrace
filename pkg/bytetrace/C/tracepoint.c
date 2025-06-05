@@ -153,7 +153,6 @@ static __always_inline int parse_l2(struct trace_context* ctx)
 
 static __always_inline int parse(struct trace_context* ctx)
 {
-    struct sk_buff* skb = ctx->skb;
     struct option* opt = ctx->opt;
     int reason = ctx->reason;
 
