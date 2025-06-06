@@ -94,13 +94,9 @@ static __always_inline int parse_ipv4(struct trace_context* ctx)
     struct option* opt = ctx->opt;
     struct iphdr* ip = &ctx->ip;
 
-    void* head;
-    u16 network_header;
-
-    head = BPF_CORE_READ(skb, head);
-    network_header = BPF_CORE_READ(skb, network_header);
-
-    bpf_probe_read(ip, sizeof(*ip), head + network_header);
+    void* head = BPF_CORE_READ(skb, head);
+    u16 network_header = BPF_CORE_READ(skb, network_header);
+    bpf_probe_read_kernel(ip, sizeof(*ip), head + network_header);
 
     if(opt->proto && opt->proto != ip->protocol) {
         return -1;
@@ -146,7 +142,7 @@ static __always_inline int parse_l2(struct trace_context* ctx)
 
     void* head = BPF_CORE_READ(skb, head);
     u16 mac_header = BPF_CORE_READ(skb, mac_header);
-    bpf_probe_read(&ctx->eth, sizeof(ctx->eth), head + mac_header);
+    bpf_probe_read_kernel(&ctx->eth, sizeof(ctx->eth), head + mac_header);
 
     return parse_l3(ctx);
 }
@@ -185,7 +181,6 @@ static __always_inline int submit(struct trace_context* ctx)
 
 static __always_inline int trace(struct trace_context* ctx)
 {
-    struct sk_buff* skb = ctx->skb;
     struct option* opt = ctx->opt;
 
     if(parse(ctx)) {
