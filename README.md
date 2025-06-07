@@ -11,9 +11,9 @@
 ## Features
 
 - Locate kernel packet drop reason and function
-- Support filtering by interface, protocol, ip, port, etc.
+- Filter by interface, protocol, ip, port, etc.
 - Dump packet drop call stack
-- Lightweight and efficient
+- Cross-platform support (Linux)
 - Easy to use and deploy
 
 ## Getting Started
