@@ -12,7 +12,7 @@
 
 typedef void* stack_trace_t[64];
 
-static inline bool eth_type_vlan(u16 ethertype)
+static __always_inline bool eth_type_vlan(u16 ethertype)
 {
     switch(ethertype) {
     case bpf_htons(ETH_P_8021Q):
@@ -21,7 +21,7 @@ static inline bool eth_type_vlan(u16 ethertype)
     }
 }
 
-static __always_inline int safe_strncmp(u8* s1, u8* s2, int n)
+static __always_inline int strncmp(u8* s1, u8* s2, int n)
 {
     for(int i = 0; i < n; i++) {
         if(s1[i] != s2[i])
@@ -123,14 +123,14 @@ static __always_inline int parse_l3(struct trace_context* ctx)
 static __always_inline int parse_l2(struct trace_context* ctx)
 {
     struct sk_buff* skb = ctx->skb;
-    struct ethhdr* eth = &ctx->eth;
     struct option* opt = ctx->opt;
+    struct ethhdr* eth = &ctx->eth;
 
     ctx->dev = BPF_CORE_READ(skb, dev);
     if(opt->dev_name[0]) {
         u8 name[16];
         bpf_probe_read_kernel_str(name, sizeof(name), ctx->dev->name);
-        if(safe_strncmp(name, opt->dev_name, sizeof(name))) {
+        if(strncmp(name, opt->dev_name, sizeof(name))) {
             return -1;
         }
     }
@@ -142,7 +142,7 @@ static __always_inline int parse_l2(struct trace_context* ctx)
 
     void* head = BPF_CORE_READ(skb, head);
     u16 mac_header = BPF_CORE_READ(skb, mac_header);
-    bpf_probe_read_kernel(&ctx->eth, sizeof(ctx->eth), head + mac_header);
+    bpf_probe_read_kernel(eth, sizeof(*eth), head + mac_header);
 
     return parse_l3(ctx);
 }

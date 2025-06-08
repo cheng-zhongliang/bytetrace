@@ -1,3 +1,4 @@
 build/bytetrace
 vmlinux*
 *_bpf*.*
+.vscode
