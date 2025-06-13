@@ -9,6 +9,7 @@
 #define ETH_P_IPV6 0x86DD
 #define ETH_P_8021Q 0x8100
 #define ETH_P_8021AD 0x88A8
+#define ETH_HLEN 14
 
 typedef void* stack_trace_t[64];
 
@@ -66,6 +67,7 @@ struct trace_context {
     struct option* opt;
     struct trace_event_raw_kfree_skb* raw_ctx;
     struct sk_buff* skb;
+    void* pos;
 };
 
 struct {
@@ -90,13 +92,11 @@ struct {
 
 static __always_inline int parse_ipv4(struct trace_context* ctx)
 {
-    struct sk_buff* skb = ctx->skb;
+    void* pos = ctx->pos;
     struct option* opt = ctx->opt;
     struct iphdr* ip = &ctx->ip;
 
-    void* head = BPF_CORE_READ(skb, head);
-    u16 network_header = BPF_CORE_READ(skb, network_header);
-    bpf_probe_read_kernel(ip, sizeof(*ip), head + network_header);
+    bpf_probe_read_kernel(ip, sizeof(*ip), pos);
 
     if(opt->proto && opt->proto != ip->protocol) {
         return -1;
@@ -142,7 +142,12 @@ static __always_inline int parse_l2(struct trace_context* ctx)
 
     void* head = BPF_CORE_READ(skb, head);
     u16 mac_header = BPF_CORE_READ(skb, mac_header);
-    bpf_probe_read_kernel(eth, sizeof(*eth), head + mac_header);
+
+    ctx->pos = head + mac_header;
+
+    bpf_probe_read_kernel(eth, sizeof(*eth), ctx->pos);
+
+    ctx->pos += ETH_HLEN;
 
     return parse_l3(ctx);
 }
