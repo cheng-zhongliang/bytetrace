@@ -61,8 +61,12 @@ struct trace_context {
     u16 reason;
     u32 stack_id;
     u64 location;
+    u16 sport;
+    u16 dport;
     struct ethhdr eth;
     struct iphdr ip;
+    struct udphdr udp;
+    struct tcphdr tcp;
     struct net_device* dev;
     struct option* opt;
     struct trace_event_raw_kfree_skb* raw_ctx;
@@ -90,6 +94,39 @@ struct {
     __uint(max_entries, 0xfff);
 } stacks SEC(".maps");
 
+static __always_inline int parse_l4(struct trace_context* ctx)
+{
+    void* pos = ctx->pos;
+    struct option* opt = ctx->opt;
+
+    switch(ctx->ip.protocol) {
+    case IPPROTO_UDP: {
+        struct udphdr* udp = &ctx->udp;
+        bpf_probe_read_kernel(udp, sizeof(*udp), pos);
+        ctx->sport = udp->source;
+        ctx->dport = udp->dest;
+        break;
+    };
+    case IPPROTO_TCP: {
+        struct tcphdr* tcp = &ctx->tcp;
+        bpf_probe_read_kernel(tcp, sizeof(*tcp), pos);
+        ctx->sport = tcp->source;
+        ctx->dport = tcp->dest;
+        break;
+    }
+    default: return -1;
+    }
+
+    if(opt->sport && opt->sport != ctx->sport) {
+        return -1;
+    }
+    if(opt->dport && opt->dport != ctx->dport) {
+        return -1;
+    }
+
+    return 0;
+}
+
 static __always_inline int parse_ipv4(struct trace_context* ctx)
 {
     void* pos = ctx->pos;
@@ -114,10 +151,18 @@ static __always_inline int parse_ipv4(struct trace_context* ctx)
 static __always_inline int parse_l3(struct trace_context* ctx)
 {
     switch(ctx->eth.h_proto) {
-    case bpf_htons(ETH_P_IP): return parse_ipv4(ctx);
+    case bpf_htons(ETH_P_IP): {
+        if(parse_ipv4(ctx)) {
+            return -1;
+        }
+        ctx->pos += ctx->ip.ihl * 4;
+        break;
+    };
     case bpf_htons(ETH_P_IPV6): return 0;
     default: return -1;
     }
+
+    return parse_l4(ctx);
 }
 
 static __always_inline int parse_l2(struct trace_context* ctx)
@@ -174,8 +219,10 @@ static __always_inline int submit(struct trace_context* ctx)
     e->reason = ctx->reason;
     e->location = ctx->location;
     e->proto = ctx->ip.protocol;
-    e->saddr = ctx->ip.saddr;
-    e->daddr = ctx->ip.daddr;
+    e->saddr = bpf_ntohl(ctx->ip.saddr);
+    e->daddr = bpf_ntohl(ctx->ip.daddr);
+    e->sport = bpf_ntohs(ctx->sport);
+    e->dport = bpf_ntohs(ctx->dport);
     e->stack_id = ctx->stack_id;
     bpf_probe_read_kernel_str(e->dev_name, sizeof(e->dev_name), ctx->dev->name);
 

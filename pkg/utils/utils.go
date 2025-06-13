@@ -7,7 +7,7 @@ import (
 
 func IntToIP(ipNum uint32) net.IP {
 	ip := make(net.IP, 4)
-	binary.NativeEndian.PutUint32(ip, ipNum)
+	binary.BigEndian.PutUint32(ip, ipNum)
 	return ip
 }
 
@@ -16,4 +16,8 @@ func IpToInt(ip net.IP) uint32 {
 		return 0
 	}
 	return binary.LittleEndian.Uint32(ip)
+}
+
+func Htons(port uint16) uint16 {
+	return binary.LittleEndian.Uint16([]byte{byte(port >> 8), byte(port & 0xff)})
 }
