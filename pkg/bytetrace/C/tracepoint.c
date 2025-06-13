@@ -158,7 +158,7 @@ static __always_inline int parse_l3(struct trace_context* ctx)
         ctx->pos += ctx->ip.ihl * 4;
         break;
     };
-    case bpf_htons(ETH_P_IPV6): return 0;
+    case bpf_htons(ETH_P_IPV6): return -1;
     default: return -1;
     }
 
