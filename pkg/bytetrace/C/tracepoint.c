@@ -204,6 +204,8 @@ static __always_inline int parse_l2(struct trace_context* ctx)
                 return -1;
             }
             ctx->vlan_id = vlan_id;
+        } else {
+            return -1;
         }
     }
 
