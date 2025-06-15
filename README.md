@@ -43,6 +43,7 @@ Flags:
   -d, --daddr ip           destination address
   -S, --sport uint16       source port
   -D, --dport uint16       destination port
+  -V, --vlan uint16        VLAN ID
   -i, --interface string   interface name
   -r, --valid-reason       valid drop reason
   -b, --btf string         BTF file path
