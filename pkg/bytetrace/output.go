@@ -7,7 +7,7 @@ import (
 
 	"bytetrace/pkg/dropreason"
 	"bytetrace/pkg/kallsyms"
-	. "bytetrace/pkg/utils"
+	"bytetrace/pkg/utils"
 
 	"github.com/olekukonko/tablewriter"
 )
@@ -57,9 +57,10 @@ func (t *table) output(ev *tracepointEvent, stacks []uint64) {
 	rows := make([]string, 0)
 	if t.verbose {
 		rows = append(rows, string(ev.DevName[:]))
+		rows = append(rows, fmt.Sprintf("%d", ev.VlanId))
 	}
-	rows = append(rows, IntToIP(ev.Saddr).String())
-	rows = append(rows, IntToIP(ev.Daddr).String())
+	rows = append(rows, utils.IntToIP(ev.Saddr).String())
+	rows = append(rows, utils.IntToIP(ev.Daddr).String())
 	rows = append(rows, fmt.Sprintf("%d", ev.Proto))
 	rows = append(rows, fmt.Sprintf("%d", ev.Sport))
 	rows = append(rows, fmt.Sprintf("%d", ev.Dport))
@@ -88,6 +89,7 @@ func (t *table) setup() {
 	hs := make([]string, 0)
 	if t.verbose {
 		hs = append(hs, "Interface")
+		hs = append(hs, "Vlan")
 	}
 	hs = append(hs, "Source")
 	hs = append(hs, "Destination")
@@ -102,6 +104,7 @@ func (t *table) setup() {
 		cs := make([]tablewriter.Colors, 0)
 		if t.verbose {
 			cs = append(cs, tablewriter.Colors{tablewriter.BgCyanColor})
+			cs = append(cs, tablewriter.Colors{tablewriter.BgWhiteColor})
 		}
 		cs = append(cs, tablewriter.Colors{tablewriter.BgBlueColor})
 		cs = append(cs, tablewriter.Colors{tablewriter.BgBlueColor})
