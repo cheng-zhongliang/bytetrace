@@ -196,17 +196,13 @@ static __always_inline int parse_l2(struct trace_context* ctx)
         return 0;
     }
 
-    if(opt->vlan_id) {
-        u16 vlan_tci = BPF_CORE_READ(skb, vlan_tci);
-        if(skb_vlan_tag_present(vlan_tci)) {
-            u16 vlan_id = vlan_tci & VLAN_VID_MASK;
-            if(vlan_id != opt->vlan_id) {
-                return -1;
-            }
-            ctx->vlan_id = vlan_id;
-        } else {
+    u16 vlan_tci = BPF_CORE_READ(skb, vlan_tci);
+    if(skb_vlan_tag_present(vlan_tci)) {
+        u16 vlan_id = vlan_tci & VLAN_VID_MASK;
+        if(opt->vlan_id && vlan_id != opt->vlan_id) {
             return -1;
         }
+        ctx->vlan_id = vlan_id;
     }
 
     void* head = BPF_CORE_READ(skb, head);
