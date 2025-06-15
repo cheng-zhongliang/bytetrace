@@ -28,6 +28,7 @@ func init() {
 	cmd.Flags().IPVarP(&opt.Daddr, "daddr", "d", nil, "destination address")
 	cmd.Flags().Uint16VarP(&opt.Sport, "sport", "S", 0, "source port")
 	cmd.Flags().Uint16VarP(&opt.Dport, "dport", "D", 0, "destination port")
+	cmd.Flags().Uint16VarP(&opt.VlanId, "vlan", "V", 0, "VLAN ID")
 	cmd.Flags().StringVarP(&opt.Interface, "interface", "i", "", "interface name")
 	cmd.Flags().BoolVarP(&opt.ValidReason, "valid-reason", "r", false, "valid drop reason")
 	cmd.Flags().StringVarP(&opt.BTFPath, "btf", "b", "", "BTF file path")

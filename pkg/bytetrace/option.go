@@ -11,6 +11,7 @@ type Option struct {
 	Daddr       net.IP
 	Sport       uint16
 	Dport       uint16
+	VlanId      uint16
 	Stack       bool
 	Verbose     bool
 	ValidReason bool
@@ -26,6 +27,7 @@ func (o *Option) toTracepointOption() *tracepointOption {
 		Daddr:       utils.IpToInt(o.Daddr),
 		Sport:       utils.Htons(o.Sport),
 		Dport:       utils.Htons(o.Dport),
+		VlanId:      o.VlanId,
 		Stack:       o.Stack,
 		Verbose:     o.Verbose,
 		ValidReason: o.ValidReason,

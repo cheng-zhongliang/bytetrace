@@ -11,6 +11,9 @@
 #define ETH_P_8021AD 0x88A8
 #define ETH_HLEN 14
 
+#define VLAN_TAG_PRESENT 0x1000
+#define VLAN_VID_MASK 0x0FFF
+
 typedef void* stack_trace_t[64];
 
 static __always_inline bool eth_type_vlan(u16 ethertype)
@@ -20,6 +23,11 @@ static __always_inline bool eth_type_vlan(u16 ethertype)
     case bpf_htons(ETH_P_8021AD): return true;
     default: return false;
     }
+}
+
+static __always_inline bool skb_vlan_tag_present(u16 vlan_tci)
+{
+    return (vlan_tci & VLAN_TAG_PRESENT) != 0;
 }
 
 static __always_inline int strncmp(u8* s1, u8* s2, int n)
@@ -39,6 +47,7 @@ struct option {
     u32 daddr;
     u16 sport;
     u16 dport;
+    u16 vlan_id;
     bool stack;
     bool verbose;
     bool valid_reason;
@@ -53,6 +62,7 @@ struct event {
     u32 daddr;
     u16 sport;
     u16 dport;
+    u16 vlan_id;
     u8 dev_name[16];
     u32 stack_id;
 };
@@ -63,6 +73,7 @@ struct trace_context {
     u64 location;
     u16 sport;
     u16 dport;
+    u16 vlan_id;
     struct ethhdr eth;
     struct iphdr ip;
     struct udphdr udp;
@@ -185,6 +196,17 @@ static __always_inline int parse_l2(struct trace_context* ctx)
         return 0;
     }
 
+    if(opt->vlan_id) {
+        u16 vlan_tci = BPF_CORE_READ(skb, vlan_tci);
+        if(skb_vlan_tag_present(vlan_tci)) {
+            u16 vlan_id = vlan_tci & VLAN_VID_MASK;
+            if(vlan_id != opt->vlan_id) {
+                return -1;
+            }
+            ctx->vlan_id = vlan_id;
+        }
+    }
+
     void* head = BPF_CORE_READ(skb, head);
     u16 mac_header = BPF_CORE_READ(skb, mac_header);
 
@@ -223,6 +245,7 @@ static __always_inline int submit(struct trace_context* ctx)
     e->daddr = bpf_ntohl(ctx->ip.daddr);
     e->sport = bpf_ntohs(ctx->sport);
     e->dport = bpf_ntohs(ctx->dport);
+    e->vlan_id = ctx->vlan_id;
     e->stack_id = ctx->stack_id;
     bpf_probe_read_kernel_str(e->dev_name, sizeof(e->dev_name), ctx->dev->name);
 
