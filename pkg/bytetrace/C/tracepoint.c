@@ -105,28 +105,16 @@ struct {
     __uint(max_entries, 0xfff);
 } stacks SEC(".maps");
 
-static __always_inline int parse_l4(struct trace_context* ctx)
+static __always_inline int parse_udp(struct trace_context* ctx)
 {
     void* pos = ctx->pos;
     struct option* opt = ctx->opt;
 
-    switch(ctx->ip.protocol) {
-    case IPPROTO_UDP: {
-        struct udphdr* udp = &ctx->udp;
-        bpf_probe_read_kernel(udp, sizeof(*udp), pos);
-        ctx->sport = udp->source;
-        ctx->dport = udp->dest;
-        break;
-    };
-    case IPPROTO_TCP: {
-        struct tcphdr* tcp = &ctx->tcp;
-        bpf_probe_read_kernel(tcp, sizeof(*tcp), pos);
-        ctx->sport = tcp->source;
-        ctx->dport = tcp->dest;
-        break;
-    }
-    default: return -1;
-    }
+    struct udphdr* udp = &ctx->udp;
+    bpf_probe_read_kernel(udp, sizeof(*udp), pos);
+
+    ctx->sport = udp->source;
+    ctx->dport = udp->dest;
 
     if(opt->sport && opt->sport != ctx->sport) {
         return -1;
@@ -136,6 +124,36 @@ static __always_inline int parse_l4(struct trace_context* ctx)
     }
 
     return 0;
+}
+
+static __always_inline int parse_tcp(struct trace_context* ctx)
+{
+    void* pos = ctx->pos;
+    struct option* opt = ctx->opt;
+
+    struct tcphdr* tcp = &ctx->tcp;
+    bpf_probe_read_kernel(tcp, sizeof(*tcp), pos);
+
+    ctx->sport = tcp->source;
+    ctx->dport = tcp->dest;
+
+    if(opt->sport && opt->sport != ctx->sport) {
+        return -1;
+    }
+    if(opt->dport && opt->dport != ctx->dport) {
+        return -1;
+    }
+
+    return 0;
+}
+
+static __always_inline int parse_l4(struct trace_context* ctx)
+{
+    switch(ctx->ip.protocol) {
+    case IPPROTO_UDP: return parse_udp(ctx);
+    case IPPROTO_TCP: return parse_tcp(ctx);
+    default: return -1;
+    }
 }
 
 static __always_inline int parse_ipv4(struct trace_context* ctx)

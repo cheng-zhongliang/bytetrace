@@ -8,6 +8,9 @@
 
 `bytetrace` is a light-weight dynamic tracer for linux packet drops. It helps you to locate the kernel function and reason for packet drops in a simple and efficient way.
 
+> [!NOTE]
+> IPV6 is not supported yet, but it will be added in the future.
+
 ## Features
 
 - Locate kernel packet drop reason and function
