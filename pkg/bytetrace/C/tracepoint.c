@@ -152,7 +152,7 @@ static __always_inline int parse_l4(struct trace_context* ctx)
     switch(ctx->ip.protocol) {
     case IPPROTO_UDP: return parse_udp(ctx);
     case IPPROTO_TCP: return parse_tcp(ctx);
-    default: return -1;
+    default: return 0;
     }
 }
 
@@ -187,7 +187,7 @@ static __always_inline int parse_l3(struct trace_context* ctx)
         ctx->pos += ctx->ip.ihl * 4;
         break;
     };
-    case bpf_htons(ETH_P_IPV6): return -1;
+    case bpf_htons(ETH_P_IPV6):
     default: return -1;
     }
 
