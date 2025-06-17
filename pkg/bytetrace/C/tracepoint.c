@@ -200,15 +200,6 @@ static __always_inline int parse_l2(struct trace_context* ctx)
     struct option* opt = ctx->opt;
     struct ethhdr* eth = &ctx->eth;
 
-    ctx->dev = BPF_CORE_READ(skb, dev);
-    if(opt->dev_name[0]) {
-        u8 name[16];
-        bpf_probe_read_kernel_str(name, sizeof(name), ctx->dev->name);
-        if(strncmp(name, opt->dev_name, sizeof(name))) {
-            return -1;
-        }
-    }
-
     u16 proto = BPF_CORE_READ(skb, protocol);
     if(eth_type_vlan(proto)) {
         return 0;
@@ -237,11 +228,21 @@ static __always_inline int parse_l2(struct trace_context* ctx)
 
 static __always_inline int parse(struct trace_context* ctx)
 {
+    struct sk_buff* skb = ctx->skb;
     struct option* opt = ctx->opt;
     int reason = ctx->reason;
 
     if(opt->valid_reason && reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
         return -1;
+    }
+
+    ctx->dev = BPF_CORE_READ(skb, dev);
+    if(opt->dev_name[0]) {
+        u8 name[16];
+        bpf_probe_read_kernel_str(name, sizeof(name), ctx->dev->name);
+        if(strncmp(name, opt->dev_name, sizeof(name))) {
+            return -1;
+        }
     }
 
     return parse_l2(ctx);
