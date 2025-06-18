@@ -208,10 +208,10 @@ static __always_inline int parse_l2(struct trace_context* ctx)
     u16 vlan_tci = BPF_CORE_READ(skb, vlan_tci);
     if(skb_vlan_tag_present(vlan_tci)) {
         u16 vlan_id = vlan_tci & VLAN_VID_MASK;
-        ctx->vlan_id = vlan_id;
         if(opt->vlan_id && vlan_id != opt->vlan_id) {
             return -1;
         }
+        ctx->vlan_id = vlan_id;
     }
 
     void* head = BPF_CORE_READ(skb, head);
