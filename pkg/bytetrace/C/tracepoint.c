@@ -109,8 +109,8 @@ static __always_inline int parse_udp(struct trace_context* ctx)
 {
     void* pos = ctx->pos;
     struct option* opt = ctx->opt;
-
     struct udphdr* udp = &ctx->udp;
+
     bpf_probe_read_kernel(udp, sizeof(*udp), pos);
 
     ctx->sport = udp->source;
@@ -130,8 +130,8 @@ static __always_inline int parse_tcp(struct trace_context* ctx)
 {
     void* pos = ctx->pos;
     struct option* opt = ctx->opt;
-
     struct tcphdr* tcp = &ctx->tcp;
+
     bpf_probe_read_kernel(tcp, sizeof(*tcp), pos);
 
     ctx->sport = tcp->source;
