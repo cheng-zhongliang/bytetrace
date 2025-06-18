@@ -174,6 +174,8 @@ static __always_inline int parse_ipv4(struct trace_context* ctx)
         return -1;
     }
 
+    ctx->pos += ctx->ip.ihl * 4;
+
     return 0;
 }
 
@@ -184,7 +186,6 @@ static __always_inline int parse_l3(struct trace_context* ctx)
         if(parse_ipv4(ctx)) {
             return -1;
         }
-        ctx->pos += ctx->ip.ihl * 4;
         break;
     };
     case bpf_htons(ETH_P_IPV6):
