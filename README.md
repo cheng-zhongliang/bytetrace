@@ -41,7 +41,7 @@ Usage:
   bytetrace [flags] <args>
 
 Flags:
-  -p, --proto uint8        l4 protocol
+  -p, --proto string       l3/l4 protocol
   -s, --saddr ip           source address
   -d, --daddr ip           destination address
   -S, --sport uint16       source port
