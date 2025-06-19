@@ -6,7 +6,7 @@ import (
 )
 
 type Option struct {
-	Proto       uint8
+	Proto       string
 	Saddr       net.IP
 	Daddr       net.IP
 	Sport       uint16
@@ -21,8 +21,11 @@ type Option struct {
 }
 
 func (o *Option) toTracepointOption() *tracepointOption {
+	l3ProtoNum := utils.L3Proto2Num(o.Proto)
+	l4ProtoNum := utils.L4Proto2Num(o.Proto)
 	return &tracepointOption{
-		Proto:       o.Proto,
+		L3Proto:     l3ProtoNum,
+		L4Proto:     l4ProtoNum,
 		Saddr:       utils.IpToInt(o.Saddr),
 		Daddr:       utils.IpToInt(o.Daddr),
 		Sport:       utils.Htons(o.Sport),

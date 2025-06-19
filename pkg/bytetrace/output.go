@@ -61,7 +61,11 @@ func (t *table) output(ev *tracepointEvent, stacks []uint64) {
 	}
 	rows = append(rows, utils.IntToIP(ev.Saddr).String())
 	rows = append(rows, utils.IntToIP(ev.Daddr).String())
-	rows = append(rows, fmt.Sprintf("%d", ev.Proto))
+	if ev.L4Proto != 0 {
+		rows = append(rows, utils.Num2L4Proto(ev.L4Proto))
+	} else if ev.L3Proto != 0 {
+		rows = append(rows, utils.Num2L3Proto(ev.L3Proto))
+	}
 	rows = append(rows, fmt.Sprintf("%d", ev.Sport))
 	rows = append(rows, fmt.Sprintf("%d", ev.Dport))
 	rows = append(rows, t.sf.Lookup(ev.Location))

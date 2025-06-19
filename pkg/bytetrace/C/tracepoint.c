@@ -42,7 +42,8 @@ static __always_inline int strncmp(u8* s1, u8* s2, int n)
 }
 
 struct option {
-    u8 proto;
+    u16 l3_proto;
+    u8 l4_proto;
     u32 saddr;
     u32 daddr;
     u16 sport;
@@ -57,7 +58,8 @@ struct option {
 struct event {
     u16 reason;
     u64 location;
-    u8 proto;
+    u16 l3_proto;
+    u8 l4_proto;
     u32 saddr;
     u32 daddr;
     u16 sport;
@@ -164,7 +166,7 @@ static __always_inline int parse_ipv4(struct trace_context* ctx)
 
     bpf_probe_read_kernel(ip, sizeof(*ip), pos);
 
-    if(opt->proto && opt->proto != ip->protocol) {
+    if(opt->l4_proto && opt->l4_proto != ip->protocol) {
         return -1;
     }
     if(opt->saddr && opt->saddr != ip->saddr) {
@@ -222,6 +224,10 @@ static __always_inline int parse_l2(struct trace_context* ctx)
 
     bpf_probe_read_kernel(eth, sizeof(*eth), ctx->pos);
 
+    if(opt->l3_proto && opt->l3_proto != eth->h_proto) {
+        return -1;
+    }
+
     ctx->pos += ETH_HLEN;
 
     return parse_l3(ctx);
@@ -258,7 +264,8 @@ static __always_inline int submit(struct trace_context* ctx)
 
     e->reason = ctx->reason;
     e->location = ctx->location;
-    e->proto = ctx->ip.protocol;
+    e->l3_proto = bpf_ntohs(ctx->eth.h_proto);
+    e->l4_proto = ctx->ip.protocol;
     e->saddr = bpf_ntohl(ctx->ip.saddr);
     e->daddr = bpf_ntohl(ctx->ip.daddr);
     e->sport = bpf_ntohs(ctx->sport);

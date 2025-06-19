@@ -23,7 +23,7 @@ var cmd = &cobra.Command{
 
 func init() {
 	cmd.Flags().SortFlags = false
-	cmd.Flags().Uint8VarP(&opt.Proto, "proto", "p", 0, "l4 protocol")
+	cmd.Flags().StringVarP(&opt.Proto, "proto", "p", "", "l3/l4 protocol")
 	cmd.Flags().IPVarP(&opt.Saddr, "saddr", "s", nil, "source address")
 	cmd.Flags().IPVarP(&opt.Daddr, "daddr", "d", nil, "destination address")
 	cmd.Flags().Uint16VarP(&opt.Sport, "sport", "S", 0, "source port")
