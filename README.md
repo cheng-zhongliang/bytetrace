@@ -62,7 +62,7 @@ Flags:
 Trace icmp packet drops on interface `ens1f0np0`:
 
 ```sh
-$ bytetrace -i ens1f0np0 -p 1 -v
+$ bytetrace -i ens1f0np0 -p icmp -v
 ```
 
 Output:
@@ -71,6 +71,6 @@ Output:
 +-----------+-------------+--------------+----------+-------+-------+--------------+----------------+
 | INTERFACE |   SOURCE    | DESTINATION  | PROTOCOL | SPORT | DPORT |   LOCATION   |     REASON     |
 +-----------+-------------+--------------+----------+-------+-------+--------------+----------------+
-| ens1f0np0 | 192.168.2.1 | 192.168.10.1 |        1 |     0 |     0 | nft_do_chain | NETFILTER_DROP |
+| ens1f0np0 | 192.168.2.1 | 192.168.10.1 | icmp     |     0 |     0 | nft_do_chain | NETFILTER_DROP |
 +-----------+-------------+--------------+----------+-------+-------+--------------+----------------+
 ```
