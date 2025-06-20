@@ -191,7 +191,7 @@ static __always_inline int parse_l3(struct trace_context* ctx)
         break;
     };
     case bpf_htons(ETH_P_IPV6):
-    default: return -1;
+    default: return 0;
     }
 
     return parse_l4(ctx);
