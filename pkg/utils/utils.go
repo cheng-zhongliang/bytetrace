@@ -33,7 +33,7 @@ func Num2L3Proto(proto uint16) string {
 	if name, ok := L3Protos[proto]; ok {
 		return name
 	}
-	return fmt.Sprintf("%d", proto)
+	return fmt.Sprintf("0x%x", proto)
 }
 
 func L4Proto2Num(proto string) uint8 {
