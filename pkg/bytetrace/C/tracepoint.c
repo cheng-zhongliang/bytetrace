@@ -192,10 +192,7 @@ static __always_inline int parse_l3(struct trace_context* ctx)
         break;
     };
     default: {
-        if(ctx->opt->l3_l4_filter) {
-            return -1;
-        }
-        return 0;
+        return ctx->opt->l3_l4_filter ? -1 : 0;
     };
     }
 
