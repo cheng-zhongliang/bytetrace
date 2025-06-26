@@ -23,6 +23,7 @@ type Option struct {
 func (o *Option) toTracepointOption() *tracepointOption {
 	l3ProtoNum := utils.L3Proto2Num(o.Proto)
 	l4ProtoNum := utils.L4Proto2Num(o.Proto)
+	l3L4Filter := (o.Saddr != nil || o.Daddr != nil || l4ProtoNum != 0 || o.Sport != 0 || o.Dport != 0)
 	return &tracepointOption{
 		L3Proto:     l3ProtoNum,
 		L4Proto:     l4ProtoNum,
@@ -39,5 +40,6 @@ func (o *Option) toTracepointOption() *tracepointOption {
 			copy(arr[:], s)
 			return arr
 		}(o.Interface),
+		L3L4Filter: l3L4Filter,
 	}
 }

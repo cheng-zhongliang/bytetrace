@@ -52,6 +52,7 @@ struct option {
     bool stack;
     bool verbose;
     bool valid_reason;
+    bool l3_l4_filter;
     u8 dev_name[16];
 };
 
@@ -191,7 +192,7 @@ static __always_inline int parse_l3(struct trace_context* ctx)
         break;
     };
     default: {
-        if(ctx->opt->l4_proto || ctx->opt->sport || ctx->opt->dport) {
+        if(ctx->opt->l3_l4_filter) {
             return -1;
         }
         return 0;
