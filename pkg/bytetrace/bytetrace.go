@@ -12,12 +12,12 @@ import (
 )
 
 type Bytetrace struct {
-	objs    tracepointObjects
-	link    link.Link
-	ring    *ringbuf.Reader
-	opt     Option
-	stacks  []uint64
-	console console
+	objs     tracepointObjects
+	link     link.Link
+	ring     *ringbuf.Reader
+	traceOpt *tracepointOption
+	stacks   []uint64
+	console  console
 }
 
 type console interface {
@@ -25,7 +25,7 @@ type console interface {
 }
 
 func New(opt Option) (*Bytetrace, error) {
-	b := &Bytetrace{opt: opt, stacks: make([]uint64, 64)}
+	b := &Bytetrace{}
 
 	opts := &ebpf.CollectionOptions{}
 	if opt.BTFPath != "" {
@@ -41,17 +41,19 @@ func New(opt Option) (*Bytetrace, error) {
 		return nil, err
 	}
 
-	t, err := newTable(opt.Verbose, opt.Color)
+	b.console, err = newTable(opt.Verbose, opt.Color)
 	if err != nil {
 		return nil, err
 	}
-	b.console = t
+
+	b.traceOpt = opt.toTracepointOption()
+	b.stacks = make([]uint64, 64)
 
 	return b, nil
 }
 
 func (b *Bytetrace) Attach() error {
-	err := b.objs.tracepointMaps.Options.Put(uint32(0), b.opt.toTracepointOption())
+	err := b.objs.tracepointMaps.Options.Put(uint32(0), b.traceOpt)
 	if err != nil {
 		return err
 	}
@@ -91,7 +93,7 @@ func (b *Bytetrace) Poll() error {
 }
 
 func (b *Bytetrace) onEvent(ev *tracepointEvent) {
-	if b.opt.Stack {
+	if ev.StackId != 0 {
 		err := b.objs.tracepointMaps.Stacks.Lookup(ev.StackId, &b.stacks)
 		if err != nil {
 			return
