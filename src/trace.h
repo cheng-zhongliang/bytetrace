@@ -12,8 +12,7 @@ struct trace_context {
     struct bpf_object* obj;
     struct perf_buffer* pb;
     const char* btf_path;
-    struct filter_option* opt;
-    int log_level;
+    struct filter_option opt;
 };
 
 int trace_init(struct trace_context* ctx);

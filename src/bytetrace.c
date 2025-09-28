@@ -1,5 +1,10 @@
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <signal.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 
 #include "argparse.h"
 #include "bytetrace.h"
@@ -17,11 +22,12 @@ static void sig_handler(int sig) {
 }
 
 static const char* description =
-"Light-weight Dynamic Tracer for Linux Packet Drop";
+"Light-weight Dynamic Tracer for Linux Network Stack";
 
 static int set_log_level(struct argparse* self, const struct argparse_option* option) {
     struct trace_context* ctx = (struct trace_context*)option->data;
-    vlog_set_levels(VLM_ANY_MODULE, VLF_ANY_FACILITY, ctx->log_level);
+    int level = *(int*)option->value;
+    vlog_set_levels(VLM_ANY_MODULE, VLF_ANY_FACILITY, level);
     return 0;
 }
 
@@ -31,26 +37,90 @@ static int print_version(struct argparse* self, const struct argparse_option* op
     return 0;
 }
 
+static int parse_iface(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* iface = *(char**)option->value;
+    memcpy(ctx->opt.iface, iface, 16);
+    return 0;
+}
+
+static int parse_ip(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* ip = *(char**)option->value;
+    int rc;
+    rc = inet_pton(AF_INET, ip, &ctx->opt.src_ip);
+    if(rc <= 0) {
+        return -2;
+    }
+    return 0;
+}
+
+static int parse_ip6(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* ip = *(char**)option->value;
+    int rc;
+    rc = inet_pton(AF_INET6, ip, &ctx->opt.src_ipv6);
+    if(rc <= 0) {
+        return -2;
+    }
+    return 0;
+}
+
+static int parse_mac(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* mac = *(char**)option->value;
+    int rc;
+    rc = sscanf(mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &ctx->opt.src_mac[0],
+    &ctx->opt.src_mac[1], &ctx->opt.src_mac[2], &ctx->opt.src_mac[3],
+    &ctx->opt.src_mac[4], &ctx->opt.src_mac[5]);
+    if(rc != 6) {
+        return -2;
+    }
+    return 0;
+}
 
 int parse_args(struct trace_context* ctx, int argc, char** argv) {
+    int log_level;
+    char* iface;
+    char* src_mac;
+    char* dst_mac;
+    char* src_ip;
+    char* dst_ip;
+
     struct argparse_option options[] = {
         OPT_GROUP("Basic options"),
-        OPT_INTEGER('l', "log-level", &ctx->log_level, "set log level (0-4)",
+        OPT_STRING('b', "btf", &ctx->btf_path, "set BTF path", NULL, 0, 0),
+        OPT_INTEGER('l', "log-level", &log_level, "set log level (0-4)",
         set_log_level, (intptr_t)ctx, 0),
         OPT_BOOLEAN('v', "version", NULL,
         "display version information and exit", print_version, 0, OPT_NONEG),
         OPT_HELP(),
         OPT_GROUP("Filter options"),
-        OPT_INTEGER('\0', "l3-proto", &ctx->opt->l3_proto,
+        OPT_STRING('\0', "iface", &iface, "set interface filter", parse_iface,
+        (intptr_t)ctx, 0),
+        OPT_INTEGER('\0', "length", &ctx->opt.length, "set packet length filter", NULL, 0, 0),
+        OPT_INTEGER('\0', "vlan-id", &ctx->opt.vlan_id, "set VLAN ID filter", NULL, 0, 0),
+        OPT_INTEGER('\0', "vlan-prio", &ctx->opt.vlan_prio,
+        "set VLAN priority filter", NULL, 0, 0),
+        OPT_STRING('\0', "src-mac", &src_mac, "set source MAC filter",
+        parse_mac, (intptr_t)ctx, 0),
+        OPT_STRING('\0', "dst-mac", &dst_mac, "set destination MAC filter",
+        parse_mac, (intptr_t)ctx, 0),
+        OPT_INTEGER('\0', "l3-proto", &ctx->opt.l3_proto,
         "set L3 protocol filter", NULL, 0, 0),
-        OPT_INTEGER('\0', "l4-proto", &ctx->opt->l4_proto,
+        OPT_INTEGER('\0', "l4-proto", &ctx->opt.l4_proto,
         "set L4 protocol filter", NULL, 0, 0),
-        OPT_INTEGER('\0', "src-ip", &ctx->opt->src_ip, "set source IP filter", NULL, 0, 0),
-        OPT_INTEGER('\0', "dst-ip", &ctx->opt->dst_ip,
-        "set destination IP filter", NULL, 0, 0),
-        OPT_INTEGER('\0', "src-port", &ctx->opt->src_port,
+        OPT_STRING('\0', "src-ip", &src_ip, "set source IP filter", parse_ip,
+        (intptr_t)ctx, 0),
+        OPT_STRING('\0', "dst-ip", &dst_ip, "set destination IP filter",
+        parse_ip, (intptr_t)ctx, 0),
+        OPT_STRING('\0', "src-ipv6", &src_ip, "set source IPv6 filter",
+        parse_ip6, (intptr_t)ctx, 0),
+        OPT_STRING('\0', "dst-ipv6", &dst_ip, "set destination IPv6 filter",
+        parse_ip6, (intptr_t)ctx, 0),
+        OPT_INTEGER('\0', "src-port", &ctx->opt.src_port,
         "set source port filter", NULL, 0, 0),
-        OPT_INTEGER('\0', "dst-port", &ctx->opt->dst_port,
+        OPT_INTEGER('\0', "dst-port", &ctx->opt.dst_port,
         "set destination port filter", NULL, 0, 0),
         OPT_END(),
     };
@@ -71,8 +141,6 @@ int parse_args(struct trace_context* ctx, int argc, char** argv) {
 int main(int argc, char** argv) {
     struct trace_context ctx;
     int rc;
-
-    vlog_set_levels(VLM_ANY_MODULE, VLF_ANY_FACILITY, VLL_ERR);
 
     rc = parse_args(&ctx, argc, argv);
     if(rc != 0) {

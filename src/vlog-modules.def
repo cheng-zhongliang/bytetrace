@@ -3,7 +3,7 @@ VLOG_MODULE(vlog)
 
 /* More modules can be added here. */
 
-VLOG_MODULE(bytrace)
+VLOG_MODULE(bytetrace)
 VLOG_MODULE(trace)
 VLOG_MODULE(kallsyms)
 

@@ -6,12 +6,18 @@
 #define UINT32 uint32_t
 
 struct filter_option {
+    UINT8 iface[16];
+    UINT16 length;
+    UINT8 vlan_id;
+    UINT8 vlan_prio;
     UINT8 src_mac[6];
     UINT8 dst_mac[6];
     UINT16 l3_proto;
     UINT8 l4_proto;
     UINT32 src_ip;
     UINT32 dst_ip;
+    UINT8 src_ipv6[16];
+    UINT8 dst_ipv6[16];
     UINT16 src_port;
     UINT16 dst_port;
 };

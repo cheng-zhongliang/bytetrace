@@ -262,7 +262,7 @@ void argparse_usage(struct argparse* self) {
     if(self->description)
         fprintf(stdout, "%s\n", self->description);
 
-    fputc('\n', stdout);
+    // fputc('\n', stdout);
 
     const struct argparse_option* options;
 
