@@ -1,2 +1,5 @@
 bytetrace
 *.o
+vmlinux.h
+tracepoint
+tracepoint.h

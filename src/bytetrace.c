@@ -19,13 +19,13 @@ static void sig_handler(int sig) {
     if(sig == SIGINT || sig == SIGTERM) {
         g_running = 0;
     }
+    VLOG_DBG(LOG_MODULE, "Signal %d received, exiting...", sig);
 }
 
 static const char* description =
 "Light-weight Dynamic Tracer for Linux Network Stack";
 
 static int set_log_level(struct argparse* self, const struct argparse_option* option) {
-    struct trace_context* ctx = (struct trace_context*)option->data;
     int level = *(int*)option->value;
     vlog_set_levels(VLM_ANY_MODULE, VLF_ANY_FACILITY, level);
     return 0;
@@ -90,10 +90,9 @@ int parse_args(struct trace_context* ctx, int argc, char** argv) {
     struct argparse_option options[] = {
         OPT_GROUP("Basic options"),
         OPT_STRING('b', "btf", &ctx->btf_path, "set BTF path", NULL, 0, 0),
-        OPT_INTEGER('l', "log-level", &log_level, "set log level (0-4)",
-        set_log_level, (intptr_t)ctx, 0),
-        OPT_BOOLEAN('v', "version", NULL,
-        "display version information and exit", print_version, 0, OPT_NONEG),
+        OPT_INTEGER('l', "log-level", &log_level, "set log level (0-4)", set_log_level, 0, 0),
+        OPT_BOOLEAN('v', "version", NULL, "show version information and exit",
+        print_version, 0, OPT_NONEG),
         OPT_HELP(),
         OPT_GROUP("Filter options"),
         OPT_STRING('\0', "iface", &iface, "set interface filter", parse_iface,
@@ -147,8 +146,33 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    rc = trace_init(&ctx);
+    if(rc != 0) {
+        return -1;
+    }
+
+    rc = trace_attach(&ctx);
+    if(rc != 0) {
+        trace_deinit(&ctx);
+        return -1;
+    }
+
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
+
+    VLOG_INFO(LOG_MODULE, "Tracing... Press Ctrl+C to stop.");
+
+    while(g_running) {
+        rc = trace_poll(&ctx, 100);
+        if(rc < 0) {
+            break;
+        }
+    }
+
+    trace_detach(&ctx);
+    trace_deinit(&ctx);
+
+    VLOG_INFO(LOG_MODULE, "Bye!");
 
     return 0;
 }

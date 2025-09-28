@@ -6,13 +6,17 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
-#include "common.h"
+#include "share.h"
 
 struct trace_context {
     struct bpf_object* obj;
     struct perf_buffer* pb;
+    struct bpf_link* link;
+    struct bpf_program* prog;
+    struct bpf_map* events_map;
+    struct bpf_map* options_map;
     const char* btf_path;
-    struct filter_option opt;
+    struct option opt;
 };
 
 int trace_init(struct trace_context* ctx);
