@@ -28,6 +28,14 @@ static const char* description =
 
 static int set_log_level(struct argparse* self, const struct argparse_option* option) {
     int level = *(int*)option->value;
+    switch(level) {
+    case 0: level = VLL_DBG; break;
+    case 1: level = VLL_INFO; break;
+    case 2: level = VLL_WARN; break;
+    case 3: level = VLL_ERR; break;
+    case 4: level = VLL_EMER; break;
+    default: return -2;
+    }
     vlog_set_levels(VLM_ANY_MODULE, VLF_ANY_FACILITY, level);
     return 0;
 }
