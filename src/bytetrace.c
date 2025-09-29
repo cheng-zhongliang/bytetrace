@@ -8,6 +8,7 @@
 
 #include "argparse.h"
 #include "bytetrace.h"
+#include "proto.h"
 #include "trace.h"
 #include "vlog.h"
 
@@ -79,6 +80,28 @@ static int parse_mac(struct argparse* self, const struct argparse_option* option
     return 0;
 }
 
+static int parse_l3_proto(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* proto = *(char**)option->value;
+    int rc;
+    rc = proto2i(proto, (int*)(&ctx->opt.l3_proto));
+    if(rc == 0) {
+        return -2;
+    }
+    return 0;
+}
+
+static int parse_l4_proto(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* proto = *(char**)option->value;
+    int rc;
+    rc = proto2i(proto, (int*)(&ctx->opt.l4_proto));
+    if(rc == 0) {
+        return -2;
+    }
+    return 0;
+}
+
 int parse_args(struct trace_context* ctx, int argc, char** argv) {
     int log_level;
     char* iface;
@@ -86,6 +109,8 @@ int parse_args(struct trace_context* ctx, int argc, char** argv) {
     char* dst_mac;
     char* src_ip;
     char* dst_ip;
+    char* l3_proto;
+    char* l4_proto;
 
     struct argparse_option options[] = {
         OPT_GROUP("Basic options"),
@@ -105,8 +130,8 @@ int parse_args(struct trace_context* ctx, int argc, char** argv) {
         OPT_INTEGER('\0', "vlan-id", &ctx->opt.vlan_id, "set VLAN ID filter", NULL, 0, 0),
         OPT_INTEGER('\0', "vlan-prio", &ctx->opt.vlan_prio,
         "set VLAN priority filter", NULL, 0, 0),
-        OPT_INTEGER('\0', "l3-proto", &ctx->opt.l3_proto,
-        "set L3 protocol filter", NULL, 0, 0),
+        OPT_STRING('\0', "l3-proto", &l3_proto, "set L3 protocol filter",
+        parse_l3_proto, (intptr_t)ctx, 0),
         OPT_STRING('\0', "src-ip", &src_ip, "set source IP filter", parse_ip,
         (intptr_t)ctx, 0),
         OPT_STRING('\0', "dst-ip", &dst_ip, "set destination IP filter",
@@ -115,8 +140,8 @@ int parse_args(struct trace_context* ctx, int argc, char** argv) {
         parse_ip6, (intptr_t)ctx, 0),
         OPT_STRING('\0', "dst-ipv6", &dst_ip, "set destination IPv6 filter",
         parse_ip6, (intptr_t)ctx, 0),
-        OPT_INTEGER('\0', "l4-proto", &ctx->opt.l4_proto,
-        "set L4 protocol filter", NULL, 0, 0),
+        OPT_STRING('\0', "l4-proto", &l4_proto, "set L4 protocol filter",
+        parse_l4_proto, (intptr_t)ctx, 0),
         OPT_INTEGER('\0', "src-port", &ctx->opt.src_port,
         "set source port filter", NULL, 0, 0),
         OPT_INTEGER('\0', "dst-port", &ctx->opt.dst_port,
