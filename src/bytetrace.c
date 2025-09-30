@@ -14,13 +14,11 @@
 
 #define LOG_MODULE VLM_bytetrace
 
-static int g_running = 1;
+static volatile sig_atomic_t g_running = 1;
 
 static void sig_handler(int sig) {
-    if(sig == SIGINT || sig == SIGTERM) {
-        g_running = 0;
-    }
-    VLOG_DBG(LOG_MODULE, "Signal %d received, exiting...", sig);
+    (void)sig;
+    g_running = 0;
 }
 
 static const char* description =
