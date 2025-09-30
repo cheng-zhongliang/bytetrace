@@ -171,7 +171,7 @@ int parse_args(struct trace_context* ctx, int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    struct trace_context ctx;
+    struct trace_context ctx = { 0 };
     int rc;
 
     rc = parse_args(&ctx, argc, argv);
