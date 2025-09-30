@@ -2,19 +2,27 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "share.h"
 #include "trace.h"
 #include "tracepoint.h"
 #include "vlog.h"
 
 #define LOG_MODULE VLM_trace
 
+static void on_recv(void* ctx, int cpu, void* data, __u32 size) {
+    struct event* e = (struct event*)data;
+}
+
+static void on_lost(void* ctx, int cpu, __u64 cnt) {
+}
+
 int setup_perf_buffer(struct trace_context* ctx) {
     int fd;
 
     fd = bpf_map__fd(ctx->events_map);
 
-    ctx->pb = perf_buffer__new(fd, 8, NULL, NULL, ctx, NULL);
-    if(!ctx->pb) {
+    ctx->pb = perf_buffer__new(fd, 1024, on_recv, on_lost, ctx, NULL);
+    if(ctx->pb == NULL) {
         VLOG_ERR(LOG_MODULE, "Failed to open perf buffer: %s", strerror(errno));
         return -1;
     }
@@ -27,7 +35,7 @@ int trace_init(struct trace_context* ctx) {
     int rc;
 
     ctx->obj = bpf_object__open_mem(tracepoint, tracepoint_len, &opts);
-    if(!ctx->obj) {
+    if(ctx->obj == NULL) {
         VLOG_ERR(LOG_MODULE, "Failed to open BPF object: %s", strerror(errno));
         return -1;
     }
@@ -39,7 +47,7 @@ int trace_init(struct trace_context* ctx) {
         return -1;
     }
 
-    ctx->prog = bpf_object__find_program_by_name(ctx->obj, "trace_func");
+    ctx->prog = bpf_object__find_program_by_name(ctx->obj, "trace_skb");
     ctx->events_map = bpf_object__find_map_by_name(ctx->obj, "events");
     ctx->options_map = bpf_object__find_map_by_name(ctx->obj, "options");
 
@@ -57,7 +65,7 @@ int trace_attach(struct trace_context* ctx) {
     }
 
     ctx->link = bpf_program__attach(ctx->prog);
-    if(!ctx->link) {
+    if(ctx->link == NULL) {
         VLOG_ERR(LOG_MODULE, "Failed to attach BPF program: %s", strerror(errno));
         return -1;
     }
@@ -74,7 +82,7 @@ void trace_detach(struct trace_context* ctx) {
 int trace_poll(struct trace_context* ctx, int timeout_ms) {
     int rc;
     rc = perf_buffer__poll(ctx->pb, timeout_ms);
-    if(rc < 0) {
+    if(rc < 0 && errno != EINTR) {
         VLOG_ERR(LOG_MODULE, "Error polling perf buffer: %s", strerror(errno));
         return -1;
     }

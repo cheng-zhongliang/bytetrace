@@ -15,9 +15,10 @@ struct {
 } options SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __type(value, struct event);
-    __uint(max_entries, 1 << 24);
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(int));
+    __uint(value_size, sizeof(u32));
+    __uint(max_entries, 256);
 } events SEC(".maps");
 
 SEC("tracepoint/skb/kfree_skb")
