@@ -53,7 +53,7 @@ static int parse_iface(struct argparse* self, const struct argparse_option* opti
     return 0;
 }
 
-static int parse_ip(struct argparse* self, const struct argparse_option* option) {
+static int parse_src_ip(struct argparse* self, const struct argparse_option* option) {
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* ip = *(char**)option->value;
     int rc;
@@ -64,7 +64,18 @@ static int parse_ip(struct argparse* self, const struct argparse_option* option)
     return 0;
 }
 
-static int parse_ip6(struct argparse* self, const struct argparse_option* option) {
+static int parse_dst_ip(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* ip = *(char**)option->value;
+    int rc;
+    rc = inet_pton(AF_INET, ip, &ctx->opt.dst_ip);
+    if(rc <= 0) {
+        return -2;
+    }
+    return 0;
+}
+
+static int parse_src_ip6(struct argparse* self, const struct argparse_option* option) {
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* ip = *(char**)option->value;
     int rc;
@@ -75,13 +86,37 @@ static int parse_ip6(struct argparse* self, const struct argparse_option* option
     return 0;
 }
 
-static int parse_mac(struct argparse* self, const struct argparse_option* option) {
+static int parse_dst_ip6(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* ip = *(char**)option->value;
+    int rc;
+    rc = inet_pton(AF_INET6, ip, &ctx->opt.dst_ipv6);
+    if(rc <= 0) {
+        return -2;
+    }
+    return 0;
+}
+
+static int parse_src_mac(struct argparse* self, const struct argparse_option* option) {
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* mac = *(char**)option->value;
     int rc;
     rc = sscanf(mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &ctx->opt.src_mac[0],
     &ctx->opt.src_mac[1], &ctx->opt.src_mac[2], &ctx->opt.src_mac[3],
     &ctx->opt.src_mac[4], &ctx->opt.src_mac[5]);
+    if(rc != 6) {
+        return -2;
+    }
+    return 0;
+}
+
+static int parse_dst_mac(struct argparse* self, const struct argparse_option* option) {
+    struct trace_context* ctx = (struct trace_context*)option->data;
+    char* mac = *(char**)option->value;
+    int rc;
+    rc = sscanf(mac, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &ctx->opt.dst_mac[0],
+    &ctx->opt.dst_mac[1], &ctx->opt.dst_mac[2], &ctx->opt.dst_mac[3],
+    &ctx->opt.dst_mac[4], &ctx->opt.dst_mac[5]);
     if(rc != 6) {
         return -2;
     }
@@ -132,22 +167,22 @@ int parse_args(struct trace_context* ctx, int argc, char** argv) {
         (intptr_t)ctx, 0),
         OPT_INTEGER('\0', "length", &ctx->opt.length, "set packet length filter", NULL, 0, 0),
         OPT_STRING('\0', "src-mac", &src_mac, "set source MAC filter",
-        parse_mac, (intptr_t)ctx, 0),
+        parse_src_mac, (intptr_t)ctx, 0),
         OPT_STRING('\0', "dst-mac", &dst_mac, "set destination MAC filter",
-        parse_mac, (intptr_t)ctx, 0),
+        parse_dst_mac, (intptr_t)ctx, 0),
         OPT_INTEGER('\0', "vlan-id", &ctx->opt.vlan_id, "set VLAN ID filter", NULL, 0, 0),
         OPT_INTEGER('\0', "vlan-prio", &ctx->opt.vlan_prio,
         "set VLAN priority filter", NULL, 0, 0),
         OPT_STRING('\0', "l3-proto", &l3_proto, "set L3 protocol filter",
         parse_l3_proto, (intptr_t)ctx, 0),
-        OPT_STRING('\0', "src-ip", &src_ip, "set source IP filter", parse_ip,
-        (intptr_t)ctx, 0),
+        OPT_STRING('\0', "src-ip", &src_ip, "set source IP filter",
+        parse_src_ip, (intptr_t)ctx, 0),
         OPT_STRING('\0', "dst-ip", &dst_ip, "set destination IP filter",
-        parse_ip, (intptr_t)ctx, 0),
+        parse_dst_ip, (intptr_t)ctx, 0),
         OPT_STRING('\0', "src-ipv6", &src_ip, "set source IPv6 filter",
-        parse_ip6, (intptr_t)ctx, 0),
+        parse_src_ip6, (intptr_t)ctx, 0),
         OPT_STRING('\0', "dst-ipv6", &dst_ip, "set destination IPv6 filter",
-        parse_ip6, (intptr_t)ctx, 0),
+        parse_dst_ip6, (intptr_t)ctx, 0),
         OPT_STRING('\0', "l4-proto", &l4_proto, "set L4 protocol filter",
         parse_l4_proto, (intptr_t)ctx, 0),
         OPT_INTEGER('\0', "src-port", &ctx->opt.src_port,
