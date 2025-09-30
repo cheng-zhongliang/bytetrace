@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "output.h"
 #include "share.h"
 #include "trace.h"
 #include "tracepoint.h"
@@ -9,21 +10,20 @@
 
 #define LOG_MODULE VLM_trace
 
-static void on_recv(void* ctx, int cpu, void* data, __u32 size) {
+static int on_recv(void* ctx, void* data, size_t size) {
     struct event* e = (struct event*)data;
+    print_event(e);
+    return 0;
 }
 
-static void on_lost(void* ctx, int cpu, __u64 cnt) {
-}
-
-int setup_perf_buffer(struct trace_context* ctx) {
+int setup_event_listen(struct trace_context* ctx) {
     int fd;
 
     fd = bpf_map__fd(ctx->events_map);
 
-    ctx->pb = perf_buffer__new(fd, 1024, on_recv, on_lost, ctx, NULL);
-    if(ctx->pb == NULL) {
-        VLOG_ERR(LOG_MODULE, "Failed to open perf buffer: %s", strerror(errno));
+    ctx->rb = ring_buffer__new(fd, on_recv, NULL, NULL);
+    if(ctx->rb == NULL) {
+        VLOG_ERR(LOG_MODULE, "Failed to open ring buffer: %s", strerror(errno));
         return -1;
     }
 
@@ -51,7 +51,7 @@ int trace_init(struct trace_context* ctx) {
     ctx->events_map = bpf_object__find_map_by_name(ctx->obj, "events");
     ctx->options_map = bpf_object__find_map_by_name(ctx->obj, "options");
 
-    return setup_perf_buffer(ctx);
+    return setup_event_listen(ctx);
 }
 
 int trace_attach(struct trace_context* ctx) {
@@ -81,7 +81,7 @@ void trace_detach(struct trace_context* ctx) {
 
 int trace_poll(struct trace_context* ctx, int timeout_ms) {
     int rc;
-    rc = perf_buffer__poll(ctx->pb, timeout_ms);
+    rc = ring_buffer__poll(ctx->rb, timeout_ms);
     if(rc < 0 && errno != EINTR) {
         VLOG_ERR(LOG_MODULE, "Error polling perf buffer: %s", strerror(errno));
         return -1;
@@ -90,8 +90,8 @@ int trace_poll(struct trace_context* ctx, int timeout_ms) {
 }
 
 void trace_deinit(struct trace_context* ctx) {
-    if(ctx->pb) {
-        perf_buffer__free(ctx->pb);
+    if(ctx->rb) {
+        ring_buffer__free(ctx->rb);
     }
     if(ctx->obj) {
         bpf_object__close(ctx->obj);

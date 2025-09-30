@@ -10,7 +10,7 @@
 
 struct trace_context {
     struct bpf_object* obj;
-    struct perf_buffer* pb;
+    struct ring_buffer* rb;
     struct bpf_link* link;
     struct bpf_program* prog;
     struct bpf_map* events_map;

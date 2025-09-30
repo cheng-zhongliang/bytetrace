@@ -50,6 +50,7 @@ struct event {
     s_uint16 reason;
     s_uint32 stack_id;
     s_uint64 location;
+    s_uint64 timestamp;
 };
 
 #endif
