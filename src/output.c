@@ -188,6 +188,7 @@ int print_reason(char* buf, int length, struct event* e) {
     int n;
 
     reason = get_drop_reason(e->reason);
+
     if(reason) {
         n = snprintf(buf, length, "reason %s", reason);
     } else {
@@ -203,15 +204,12 @@ int print_reason(char* buf, int length, struct event* e) {
 
 int print_location(char* buf, int length, struct event* e) {
     struct loc_result location = { 0 };
-    char* sym = NULL;
     int n;
 
-    if(lookup_kas_sym((void*)e->location, &location) == 0) {
-        sym = (char*)location.symbol;
-    }
+    lookup_kas_sym((void*)e->location, &location);
 
-    if(sym != NULL) {
-        n = snprintf(buf, length, "location %s", sym);
+    if(location.symbol) {
+        n = snprintf(buf, length, "location %s", location.symbol);
     } else {
         n = snprintf(buf, length, "location 0x%lx", e->location);
     }
