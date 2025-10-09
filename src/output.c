@@ -59,7 +59,7 @@ int print_dev(char* buf, int length, struct event* e) {
     int n;
 
     if(e->iface[0]) {
-        dev = e->iface;
+        dev = (char*)(e->iface);
     } else {
         dev = "unknown";
     }
