@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 
+#include "dropreason.h"
 #include "kallsyms.h"
 #include "output.h"
 
@@ -186,21 +187,13 @@ int print_reason(char* buf, int length, struct event* e) {
     char* reason;
     int n;
 
-    switch(e->reason) {
-    case 0: reason = "UNKNOWN"; break;
-    case 1: reason = "USER"; break;
-    case 2: reason = "KFREE_SKB"; break;
-    case 3: reason = "NETIF_RX"; break;
-    case 4: reason = "NETIF_TX"; break;
-    case 5: reason = "IP_LOCAL_DELIVER"; break;
-    case 6: reason = "IP_FORWARD"; break;
-    case 7: reason = "IP_LOCAL_OUT"; break;
-    case 8: reason = "NEIGHBOR"; break;
-    case 9: reason = "NET_DROP"; break;
-    default: reason = "unknown"; break;
+    reason = get_drop_reason(e->reason);
+    if(reason) {
+        n = snprintf(buf, length, "reason %s", reason);
+    } else {
+        n = snprintf(buf, length, "reason %d", e->reason);
     }
 
-    n = snprintf(buf, length, "reason %s", reason);
     if(n < 0 || n >= length) {
         return -1;
     }

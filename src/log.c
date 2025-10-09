@@ -47,10 +47,6 @@ static void stdout_callback(log_Event* ev) {
     fflush(ev->udata);
 }
 
-const char* log_level_string(int level) {
-    return level_strings[level];
-}
-
 void log_set_level(int level) {
     L.level = level;
 }
