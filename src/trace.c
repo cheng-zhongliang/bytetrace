@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "log.h"
 #include "output.h"
 #include "share.h"
 #include "trace.h"
 #include "tracepoint.h"
-#include "vlog.h"
 
 #define LOG_MODULE VLM_trace
 
@@ -23,7 +23,7 @@ int setup_event_listen(struct trace_context* ctx) {
 
     ctx->rb = ring_buffer__new(fd, on_recv, NULL, NULL);
     if(ctx->rb == NULL) {
-        VLOG_ERR(LOG_MODULE, "Failed to open ring buffer: %s", strerror(errno));
+        log_error("Failed to open ring buffer: %s", strerror(errno));
         return -1;
     }
 
@@ -36,13 +36,13 @@ int trace_init(struct trace_context* ctx) {
 
     ctx->obj = bpf_object__open_mem(tracepoint, tracepoint_len, &opts);
     if(ctx->obj == NULL) {
-        VLOG_ERR(LOG_MODULE, "Failed to open BPF object: %s", strerror(errno));
+        log_error("Failed to open BPF object: %s", strerror(errno));
         return -1;
     }
 
     rc = bpf_object__load(ctx->obj);
     if(rc != 0) {
-        VLOG_ERR(LOG_MODULE, "Failed to load BPF object: %s", strerror(errno));
+        log_error("Failed to load BPF object: %s", strerror(errno));
         bpf_object__close(ctx->obj);
         return -1;
     }
@@ -60,13 +60,13 @@ int trace_attach(struct trace_context* ctx) {
     rc = bpf_map__update_elem(ctx->options_map, &((uint32_t){ 0 }),
     sizeof(uint32_t), &ctx->opt, sizeof(ctx->opt), BPF_ANY);
     if(rc != 0) {
-        VLOG_ERR(LOG_MODULE, "Failed to update options map: %s", strerror(errno));
+        log_error("Failed to update options map: %s", strerror(errno));
         return -1;
     }
 
     ctx->link = bpf_program__attach(ctx->prog);
     if(ctx->link == NULL) {
-        VLOG_ERR(LOG_MODULE, "Failed to attach BPF program: %s", strerror(errno));
+        log_error("Failed to attach BPF program: %s", strerror(errno));
         return -1;
     }
 
@@ -83,7 +83,7 @@ int trace_poll(struct trace_context* ctx, int timeout_ms) {
     int rc;
     rc = ring_buffer__poll(ctx->rb, timeout_ms);
     if(rc < 0 && errno != EINTR) {
-        VLOG_ERR(LOG_MODULE, "Error polling perf buffer: %s", strerror(errno));
+        log_error("Error polling perf buffer: %s", strerror(errno));
         return -1;
     }
     return 0;

@@ -7,18 +7,13 @@
 
 #include "argparse.h"
 #include "bytetrace.h"
+#include "log.h"
 #include "proto.h"
 #include "trace.h"
-#include "vlog.h"
 
 #define LOG_MODULE VLM_bytetrace
 
 static volatile sig_atomic_t g_running = 1;
-
-static void sig_handler(int sig) {
-    (void)sig;
-    g_running = 0;
-}
 
 static const char* description =
 "Light-weight Dynamic Tracer for Linux Network Stack";
@@ -28,14 +23,16 @@ static const char* epilog = "\nReport bugs to <cheng.zhongliang@h3c.com>";
 static int set_log_level(struct argparse* self, const struct argparse_option* option) {
     int level = *(int*)option->value;
     switch(level) {
-    case 0: level = VLL_DBG; break;
-    case 1: level = VLL_INFO; break;
-    case 2: level = VLL_WARN; break;
-    case 3: level = VLL_ERR; break;
-    case 4: level = VLL_EMER; break;
+    case 0: level = LOG_TRACE; break;
+    case 1: level = LOG_DEBUG; break;
+    case 2: level = LOG_INFO; break;
+    case 3: level = LOG_WARN; break;
+    case 4: level = LOG_ERROR; break;
+    case 5: level = LOG_FATAL; break;
     default: return -2;
     }
-    vlog_set_levels(VLM_ANY_MODULE, VLF_ANY_FACILITY, level);
+    log_set_level(level);
+    log_set_quiet(false);
     return 0;
 }
 
@@ -144,7 +141,7 @@ static int parse_l4_proto(struct argparse* self, const struct argparse_option* o
     return 0;
 }
 
-int parse_args(struct trace_context* ctx, int argc, char** argv) {
+static int parse_args(struct trace_context* ctx, int argc, char** argv) {
     int log_level;
     char* iface;
     char* src_mac;
@@ -204,9 +201,16 @@ int parse_args(struct trace_context* ctx, int argc, char** argv) {
     return 0;
 }
 
+static void sig_handler(int sig) {
+    (void)sig;
+    g_running = 0;
+}
+
 int main(int argc, char** argv) {
     struct trace_context ctx = { 0 };
     int rc;
+
+    log_set_quiet(true);
 
     rc = parse_args(&ctx, argc, argv);
     if(rc != 0) {
@@ -227,7 +231,7 @@ int main(int argc, char** argv) {
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
 
-    VLOG_INFO(LOG_MODULE, "Tracing... Press Ctrl+C to stop.");
+    log_info("Tracing... Press Ctrl+C to stop.");
 
     while(g_running) {
         rc = trace_poll(&ctx, 100);
@@ -239,7 +243,7 @@ int main(int argc, char** argv) {
     trace_detach(&ctx);
     trace_deinit(&ctx);
 
-    VLOG_INFO(LOG_MODULE, "Bye!");
+    log_info("Bye!");
 
     return 0;
 }
