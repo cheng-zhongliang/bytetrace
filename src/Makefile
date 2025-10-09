@@ -5,7 +5,7 @@ CFLAGS = -Wall -D__USER_SPACE__
 LDFLAGS =
 LDLIBS = -lbpf
 
-SRC = bytetrace.c argparse.c trace.c log.c proto.c output.c 
+SRC = bytetrace.c argparse.c trace.c log.c proto.c output.c kallsyms.c
 TARGET = bytetrace
 
 all: $(TARGET)

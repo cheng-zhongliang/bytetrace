@@ -1,7 +1,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 
-
+#include "kallsyms.h"
 #include "output.h"
 
 typedef int (*print_fn)(char* buf, int length, struct event* e);
@@ -209,9 +209,20 @@ int print_reason(char* buf, int length, struct event* e) {
 }
 
 int print_location(char* buf, int length, struct event* e) {
+    struct loc_result location = { 0 };
+    char* sym = NULL;
     int n;
 
-    n = snprintf(buf, length, "location 0x%lx", e->location);
+    if(lookup_kas_sym((void*)e->location, &location) == 0) {
+        sym = (char*)location.symbol;
+    }
+
+    if(sym != NULL) {
+        n = snprintf(buf, length, "location %s", sym);
+    } else {
+        n = snprintf(buf, length, "location 0x%lx", e->location);
+    }
+
     if(n < 0 || n >= length) {
         return -1;
     }
