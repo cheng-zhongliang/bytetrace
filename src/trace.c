@@ -8,8 +8,6 @@
 #include "trace.h"
 #include "tracepoint.h"
 
-#define LOG_MODULE VLM_trace
-
 static int on_recv(void* ctx, void* data, size_t size) {
     struct event* e = (struct event*)data;
     print_event(e);

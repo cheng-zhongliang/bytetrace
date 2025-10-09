@@ -11,8 +11,6 @@
 #include "proto.h"
 #include "trace.h"
 
-#define LOG_MODULE VLM_bytetrace
-
 static volatile sig_atomic_t g_running = 1;
 
 static const char* description =
