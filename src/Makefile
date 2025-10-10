@@ -8,7 +8,7 @@ LDLIBS = -lbpf
 SRC = bytetrace.c argparse.c trace.c log.c proto.c output.c kallsyms.c dropreason.c
 TARGET = bytetrace
 
-all: $(TARGET)
+all: clean $(TARGET)
 
 $(TARGET): $(SRC)
 	$(MAKE) -C progs/
