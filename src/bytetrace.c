@@ -43,7 +43,11 @@ static int print_version(struct argparse* self, const struct argparse_option* op
 static int parse_iface(struct argparse* self, const struct argparse_option* option) {
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* iface = *(char**)option->value;
-    memcpy(ctx->opt.iface, iface, 16);
+    int rc;
+    rc = snprintf(ctx->opt.iface, sizeof(ctx->opt.iface), "%s", iface);
+    if(rc < 0 || rc >= sizeof(ctx->opt.iface)) {
+        return -2;
+    }
     return 0;
 }
 

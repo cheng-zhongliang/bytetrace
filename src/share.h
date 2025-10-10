@@ -16,7 +16,7 @@
 #endif
 
 struct option {
-    s_uint8 iface[16];
+    char iface[16];
     s_uint16 length;
     s_uint8 vlan_id;
     s_uint8 vlan_prio;
@@ -33,7 +33,7 @@ struct option {
 };
 
 struct event {
-    s_uint8 iface[16];
+    char iface[16];
     s_uint16 length;
     s_uint8 vlan_id;
     s_uint8 vlan_prio;
