@@ -333,8 +333,10 @@ void argparse_usage(struct argparse* self) {
     }
 
     // print epilog
-    if(self->epilog)
+    if(self->epilog) {
+        fputc('\n', stdout);
         fprintf(stdout, "%s\n", self->epilog);
+    }
 }
 
 int argparse_help_cb_no_exit(struct argparse* self, const struct argparse_option* option) {

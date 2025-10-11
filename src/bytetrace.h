@@ -3,4 +3,9 @@
 
 #define BYTETRACE_VERSION "0.1.0"
 
+#define BYTETRACE_DESCRIPTION \
+    "Light-weight Dynamic Tracer for Linux Network Stack"
+
+#define BYTETRACE_EPILOG "Report bugs to <cheng.zhongliang@h3c.com>"
+
 #endif

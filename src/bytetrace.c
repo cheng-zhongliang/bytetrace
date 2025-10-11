@@ -13,11 +13,6 @@
 
 static volatile sig_atomic_t g_running = 1;
 
-static const char* description =
-"Light-weight Dynamic Tracer for Linux Network Stack";
-
-static const char* epilog = "\nReport bugs to <cheng.zhongliang@h3c.com>";
-
 static int set_log_level(struct argparse* self, const struct argparse_option* option) {
     int level = *(int*)option->value;
     switch(level) {
@@ -194,7 +189,7 @@ static int parse_args(struct trace_context* ctx, int argc, char** argv) {
     int rc;
 
     argparse_init(&argparse, options, NULL, 0);
-    argparse_describe(&argparse, description, epilog);
+    argparse_describe(&argparse, BYTETRACE_DESCRIPTION, BYTETRACE_EPILOG);
     rc = argparse_parse(&argparse, argc, (const char**)argv);
     if(rc < 0) {
         return -1;
