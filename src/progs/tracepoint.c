@@ -113,6 +113,10 @@ static __always_inline int parse_l3(void* pos, struct option* opt, struct event*
     default: return 0;
     }
 
+    if(opt->l4_proto && ev->l4_proto != opt->l4_proto) {
+        return -1;
+    }
+
     return parse_l4(pos, opt, ev);
 }
 
