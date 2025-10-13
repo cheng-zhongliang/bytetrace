@@ -165,6 +165,10 @@ int print_l4_protocol(char* buf, int length, struct event* e)
         n = snprintf(buf, length, "TCP");
     } else if(e->l4_proto == 17) {
         n = snprintf(buf, length, "UDP");
+    } else if(e->l4_proto == 1) {
+        n = snprintf(buf, length, "ICMP");
+    } else if(e->l4_proto == 58) {
+        n = snprintf(buf, length, "ICMPv6");
     } else {
         return -1;
     }

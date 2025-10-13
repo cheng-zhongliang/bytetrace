@@ -82,6 +82,7 @@ static int parse_src_ip6(struct argparse* self, const struct argparse_option* op
     if(rc <= 0) {
         return -2;
     }
+    ctx->opt.src_ipv6_filter = 1;
     return 0;
 }
 
@@ -94,6 +95,7 @@ static int parse_dst_ip6(struct argparse* self, const struct argparse_option* op
     if(rc <= 0) {
         return -2;
     }
+    ctx->opt.dst_ipv6_filter = 1;
     return 0;
 }
 

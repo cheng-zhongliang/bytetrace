@@ -10,6 +10,10 @@
 #define memcmp __builtin_memcmp
 #define memcpy __builtin_memcpy
 
+#define VLAN_PRIO_MASK 0xe000
+#define VLAN_PRIO_SHIFT 13
+#define VLAN_VID_MASK 0x0fff
+
 struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __type(value, struct option);
@@ -21,6 +25,47 @@ struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 1 << 24);
 } events SEC(".maps");
+
+static __always_inline int parse_l4(void* pos, struct option* opt, struct event* ev)
+{
+    switch(ev->l4_proto) {
+    case 6: {
+        struct tcphdr tcph;
+        bpf_probe_read_kernel(&tcph, sizeof(tcph), pos);
+
+        ev->src_port = bpf_ntohs(tcph.source);
+        if(opt->src_port && ev->src_port != opt->src_port) {
+            return -1;
+        }
+        ev->dst_port = bpf_ntohs(tcph.dest);
+        if(opt->dst_port && ev->dst_port != opt->dst_port) {
+            return -1;
+        }
+
+        break;
+    }
+    case 17: {
+        struct udphdr udph;
+        bpf_probe_read_kernel(&udph, sizeof(udph), pos);
+
+        ev->src_port = bpf_ntohs(udph.source);
+        if(opt->src_port && ev->src_port != opt->src_port) {
+            return -1;
+        }
+        ev->dst_port = bpf_ntohs(udph.dest);
+        if(opt->dst_port && ev->dst_port != opt->dst_port) {
+            return -1;
+        }
+
+        break;
+    }
+    case 1:
+    case 58:
+    default: break;
+    }
+
+    return 0;
+}
 
 static __always_inline int parse_l3(void* pos, struct option* opt, struct event* ev)
 {
@@ -39,33 +84,54 @@ static __always_inline int parse_l3(void* pos, struct option* opt, struct event*
             return -1;
         }
 
-        pos += sizeof(iph);
+        pos += iph.ihl * 4;
         break;
     }
-    case 0x86dd:
-    default: return -1;
+    case 0x86dd: {
+        struct ipv6hdr ip6h;
+        bpf_probe_read_kernel(&ip6h, sizeof(ip6h), pos);
+        ev->l4_proto = ip6h.nexthdr;
+
+        memcpy(ev->src_ipv6, ip6h.saddr.in6_u.u6_addr8, sizeof(ip6h.saddr));
+        if(opt->src_ipv6_filter) {
+            int cmp = memcmp(ev->src_ipv6, opt->src_ipv6, sizeof(opt->src_ipv6));
+            if(cmp != 0) {
+                return -1;
+            }
+        }
+        memcpy(ev->dst_ipv6, ip6h.daddr.in6_u.u6_addr8, sizeof(ip6h.daddr));
+        if(opt->dst_ipv6_filter) {
+            int cmp = memcmp(ev->dst_ipv6, opt->dst_ipv6, sizeof(opt->dst_ipv6));
+            if(cmp != 0) {
+                return -1;
+            }
+        }
+
+        pos += sizeof(ip6h);
+        break;
+    }
+    default: return 0;
     }
 
-    return 0;
+    return parse_l4(pos, opt, ev);
 }
 
 static __always_inline int parse_l2(void* pos, struct option* opt, struct event* ev)
 {
     struct ethhdr eth;
-    int cmp;
 
     bpf_probe_read_kernel(&eth, sizeof(eth), pos);
 
     memcpy(ev->dst_mac, eth.h_dest, sizeof(eth.h_dest));
     if(opt->dst_mac_filter) {
-        cmp = memcmp(ev->dst_mac, opt->dst_mac, sizeof(opt->dst_mac));
+        int cmp = memcmp(ev->dst_mac, opt->dst_mac, sizeof(opt->dst_mac));
         if(cmp != 0) {
             return -1;
         }
     }
     memcpy(ev->src_mac, eth.h_source, sizeof(eth.h_source));
     if(opt->src_mac_filter) {
-        cmp = memcmp(ev->src_mac, opt->src_mac, sizeof(opt->src_mac));
+        int cmp = memcmp(ev->src_mac, opt->src_mac, sizeof(opt->src_mac));
         if(cmp != 0) {
             return -1;
         }
@@ -86,6 +152,8 @@ static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct
     struct net_device* dev;
     void *pos, *head;
     u16 mac_header;
+    u8 vlan_all;
+    u16 vlan_tci;
 
     dev = BPF_CORE_READ(skb, dev);
     bpf_probe_read_kernel_str(ev->iface, sizeof(ev->iface), dev->name);
@@ -98,6 +166,19 @@ static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct
 
     ev->length = BPF_CORE_READ(skb, len);
     if(opt->length && ev->length != opt->length) {
+        return -1;
+    }
+
+    vlan_all = BPF_CORE_READ(skb, vlan_all);
+    if(vlan_all) {
+        vlan_tci = BPF_CORE_READ(skb, vlan_tci);
+        ev->vlan_id = vlan_tci & VLAN_VID_MASK;
+        ev->vlan_prio = (vlan_tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
+    }
+    if(opt->vlan_id && ev->vlan_id != opt->vlan_id) {
+        return -1;
+    }
+    if(opt->vlan_prio && ev->vlan_prio != opt->vlan_prio) {
         return -1;
     }
 

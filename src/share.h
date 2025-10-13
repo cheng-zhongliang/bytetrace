@@ -29,7 +29,9 @@ struct option {
     s_uint32 src_ip;
     s_uint32 dst_ip;
     s_uint8 src_ipv6[16];
+    s_uint8 src_ipv6_filter;
     s_uint8 dst_ipv6[16];
+    s_uint8 dst_ipv6_filter;
     s_uint16 src_port;
     s_uint16 dst_port;
 };
