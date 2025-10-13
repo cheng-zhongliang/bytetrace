@@ -108,6 +108,7 @@ static int parse_src_mac(struct argparse* self, const struct argparse_option* op
     if(rc != 6) {
         return -2;
     }
+    ctx->opt.src_mac_filter = 1;
     return 0;
 }
 
@@ -122,6 +123,7 @@ static int parse_dst_mac(struct argparse* self, const struct argparse_option* op
     if(rc != 6) {
         return -2;
     }
+    ctx->opt.dst_mac_filter = 1;
     return 0;
 }
 

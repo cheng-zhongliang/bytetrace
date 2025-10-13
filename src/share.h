@@ -21,7 +21,9 @@ struct option {
     s_uint8 vlan_id;
     s_uint8 vlan_prio;
     s_uint8 src_mac[6];
+    s_uint8 src_mac_filter;
     s_uint8 dst_mac[6];
+    s_uint8 dst_mac_filter;
     s_uint16 l3_proto;
     s_uint8 l4_proto;
     s_uint32 src_ip;

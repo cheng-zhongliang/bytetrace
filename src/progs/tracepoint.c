@@ -7,6 +7,9 @@
 
 #include "share.h"
 
+#define memcmp __builtin_memcmp
+#define memcpy __builtin_memcpy
+
 struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __type(value, struct option);
@@ -19,43 +22,125 @@ struct {
     __uint(max_entries, 1 << 24);
 } events SEC(".maps");
 
-SEC("tracepoint/skb/kfree_skb")
-int trace_skb(struct trace_event_raw_kfree_skb* raw_ctx) {
-    struct option* opt;
-    struct event* ev;
+static __always_inline int parse_l3(void* pos, struct option* opt, struct event* ev)
+{
+    switch(ev->l3_proto) {
+    case 0x0800: {
+        struct iphdr iph;
+        bpf_probe_read_kernel(&iph, sizeof(iph), pos);
+        ev->l4_proto = iph.protocol;
 
-    ev = bpf_ringbuf_reserve(&events, sizeof(*ev), 0);
-    if(!ev) {
+        ev->src_ip = iph.saddr;
+        if(opt->src_ip && ev->src_ip != opt->src_ip) {
+            return -1;
+        }
+        ev->dst_ip = iph.daddr;
+        if(opt->dst_ip && ev->dst_ip != opt->dst_ip) {
+            return -1;
+        }
+
+        pos += sizeof(iph);
+        break;
+    }
+    case 0x86dd:
+    default: return -1;
+    }
+
+    return 0;
+}
+
+static __always_inline int parse_l2(void* pos, struct option* opt, struct event* ev)
+{
+    struct ethhdr eth;
+    int cmp;
+
+    bpf_probe_read_kernel(&eth, sizeof(eth), pos);
+
+    memcpy(ev->dst_mac, eth.h_dest, sizeof(eth.h_dest));
+    if(opt->dst_mac_filter) {
+        cmp = memcmp(ev->dst_mac, opt->dst_mac, sizeof(opt->dst_mac));
+        if(cmp != 0) {
+            return -1;
+        }
+    }
+    memcpy(ev->src_mac, eth.h_source, sizeof(eth.h_source));
+    if(opt->src_mac_filter) {
+        cmp = memcmp(ev->src_mac, opt->src_mac, sizeof(opt->src_mac));
+        if(cmp != 0) {
+            return -1;
+        }
+    }
+
+    ev->l3_proto = bpf_ntohs(eth.h_proto);
+    if(opt->l3_proto && ev->l3_proto != opt->l3_proto) {
+        return -1;
+    }
+
+    pos += sizeof(eth);
+
+    return parse_l3(pos, opt, ev);
+}
+
+static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct event* ev)
+{
+    struct net_device* dev;
+    void *pos, *head;
+    u16 mac_header;
+
+    dev = BPF_CORE_READ(skb, dev);
+    bpf_probe_read_kernel_str(ev->iface, sizeof(ev->iface), dev->name);
+    if(opt->iface[0]) {
+        int cmp = memcmp(ev->iface, opt->iface, sizeof(opt->iface));
+        if(cmp != 0) {
+            return -1;
+        }
+    }
+
+    ev->length = BPF_CORE_READ(skb, len);
+    if(opt->length && ev->length != opt->length) {
+        return -1;
+    }
+
+    head = BPF_CORE_READ(skb, head);
+    mac_header = BPF_CORE_READ(skb, mac_header);
+    pos = head + mac_header;
+
+    return parse_l2(pos, opt, ev);
+}
+
+static __always_inline int trace(struct sk_buff* skb, struct option* opt, struct event* ev)
+{
+    int rc = parse(skb, opt, ev);
+    if(rc != 0) {
+        bpf_ringbuf_discard(ev, 0);
         return 0;
     }
+
+    bpf_ringbuf_submit(ev, 0);
+    return 0;
+}
+
+SEC("tracepoint/skb/kfree_skb")
+int trace_skb(struct trace_event_raw_kfree_skb* ctx)
+{
+    struct sk_buff* skb = ctx->skbaddr;
+    struct option* opt;
+    struct event* ev;
 
     opt = bpf_map_lookup_elem(&options, &(u32){ 0 });
     if(!opt) {
         return 0;
     }
 
-    ev->reason = raw_ctx->reason;
-    ev->location = (u64)raw_ctx->location;
+    ev = bpf_ringbuf_reserve(&events, sizeof(*ev), 0);
+    if(!ev) {
+        return 0;
+    }
 
-    // some test data
-    __builtin_memcpy(ev->iface, "eth0", 5);
-    ev->length = 1280;
-    ev->vlan_id = 1;
-    ev->vlan_prio = 4;
-    // mac
-    __builtin_memcpy(ev->src_mac, (u8[]){ 0x11, 0x11, 0x11, 0x11, 0x11, 0x11 }, 6);
-    __builtin_memcpy(ev->dst_mac, (u8[]){ 0x22, 0x22, 0x22, 0x22, 0x22, 0x22 }, 6);
-    // ip
-    ev->l3_proto = 0x0800;
-    ev->src_ip = 0xc0a80001;
-    ev->dst_ip = 0xc0a80002;
-    ev->l4_proto = 6; // TCP
-    ev->src_port = 12345;
-    ev->dst_port = 80;
+    ev->reason = ctx->reason;
+    ev->location = (u64)ctx->location;
 
-    bpf_ringbuf_submit(ev, 0);
-
-    return 0;
+    return trace(skb, opt, ev);
 }
 
 char LICENSE[] SEC("license") = "Dual MIT/GPL";
