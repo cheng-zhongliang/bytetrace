@@ -8,13 +8,15 @@
 #include "trace.h"
 #include "tracepoint.h"
 
-static int on_recv(void* ctx, void* data, size_t size) {
+static int on_recv(void* ctx, void* data, size_t size)
+{
     struct event* e = (struct event*)data;
     print_event(e);
     return 0;
 }
 
-int setup_event_listen(struct trace_context* ctx) {
+int setup_event_listen(struct trace_context* ctx)
+{
     int fd;
 
     fd = bpf_map__fd(ctx->events_map);
@@ -28,7 +30,8 @@ int setup_event_listen(struct trace_context* ctx) {
     return 0;
 }
 
-int trace_init(struct trace_context* ctx) {
+int trace_init(struct trace_context* ctx)
+{
     DECLARE_LIBBPF_OPTS(bpf_object_open_opts, opts, .btf_custom_path = ctx->btf_path);
     int rc;
 
@@ -52,7 +55,8 @@ int trace_init(struct trace_context* ctx) {
     return setup_event_listen(ctx);
 }
 
-int trace_attach(struct trace_context* ctx) {
+int trace_attach(struct trace_context* ctx)
+{
     int rc;
 
     rc = bpf_map__update_elem(ctx->options_map, &((uint32_t){ 0 }),
@@ -71,13 +75,15 @@ int trace_attach(struct trace_context* ctx) {
     return 0;
 }
 
-void trace_detach(struct trace_context* ctx) {
+void trace_detach(struct trace_context* ctx)
+{
     bpf_link__detach(ctx->link);
     bpf_link__destroy(ctx->link);
     return;
 }
 
-int trace_poll(struct trace_context* ctx, int timeout_ms) {
+int trace_poll(struct trace_context* ctx, int timeout_ms)
+{
     int rc;
     rc = ring_buffer__poll(ctx->rb, timeout_ms);
     if(rc < 0 && errno != EINTR) {
@@ -87,7 +93,8 @@ int trace_poll(struct trace_context* ctx, int timeout_ms) {
     return 0;
 }
 
-void trace_deinit(struct trace_context* ctx) {
+void trace_deinit(struct trace_context* ctx)
+{
     if(ctx->rb) {
         ring_buffer__free(ctx->rb);
     }

@@ -26,10 +26,12 @@ LIST_HEAD(sym_list, symbol_entry);
 static struct sym_list sym_list_head = { NULL };
 
 
-static int lookup_kas_cache(uint64_t pc, struct loc_result* location) {
+static int lookup_kas_cache(uint64_t pc, struct loc_result* location)
+{
     struct symbol_entry* sym;
 
-    LIST_FOREACH(sym, &sym_list_head, list) {
+    LIST_FOREACH(sym, &sym_list_head, list)
+    {
         if((pc >= sym->start) && (pc <= sym->end)) {
             location->symbol = sym->sym_name;
             location->offset = (pc - sym->start);
@@ -40,7 +42,8 @@ static int lookup_kas_cache(uint64_t pc, struct loc_result* location) {
     return 1;
 }
 
-static void kas_add_cache(__u64 start, __u64 end, char* name) {
+static void kas_add_cache(__u64 start, __u64 end, char* name)
+{
     struct symbol_entry* sym = NULL;
 
     sym = malloc(sizeof(struct symbol_entry));
@@ -55,12 +58,14 @@ static void kas_add_cache(__u64 start, __u64 end, char* name) {
     return;
 }
 
-static void kas_update_cache(__u64 start, __u64 end, char* name) {
+static void kas_update_cache(__u64 start, __u64 end, char* name)
+{
     struct symbol_entry* sym;
     /* look for any symbol that matches our start
      * if the new end is longer than the current end, extend it
      */
-    LIST_FOREACH(sym, &sym_list_head, list) {
+    LIST_FOREACH(sym, &sym_list_head, list)
+    {
         if(start == sym->start) {
             if(end > sym->end) {
                 sym->end = end;
@@ -73,7 +78,8 @@ static void kas_update_cache(__u64 start, __u64 end, char* name) {
     kas_add_cache(start, end, name);
 }
 
-static int lookup_kas_proc(uint64_t pc, struct loc_result* location) {
+static int lookup_kas_proc(uint64_t pc, struct loc_result* location)
+{
     FILE* pf;
     uint64_t sppc;
     uint64_t min_delta, sdelta;
@@ -137,7 +143,8 @@ static int lookup_kas_proc(uint64_t pc, struct loc_result* location) {
     return 1;
 }
 
-int lookup_kas_sym(void* pc, struct loc_result* location) {
+int lookup_kas_sym(void* pc, struct loc_result* location)
+{
     __u64 pcv;
 
     pcv = (uintptr_t)pc;

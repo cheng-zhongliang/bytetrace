@@ -13,7 +13,8 @@ static char drop_reasons[REASON_MAX_COUNT][REASON_MAX_LEN] = {};
 static int drop_reason_max;
 static bool drop_reason_inited = false;
 
-bool fsearch(FILE* f, char* target) {
+bool fsearch(FILE* f, char* target)
+{
     char tmp[128];
 
     while(fscanf(f, "%s", tmp) == 1) {
@@ -23,7 +24,8 @@ bool fsearch(FILE* f, char* target) {
     return false;
 }
 
-static int parse_reason_enum() {
+static int parse_reason_enum()
+{
     char name[REASON_MAX_LEN];
     int index = 0;
     FILE* f;
@@ -48,7 +50,8 @@ static int parse_reason_enum() {
     return 0;
 }
 
-char* get_drop_reason(int index) {
+char* get_drop_reason(int index)
+{
     if(!drop_reason_inited && parse_reason_enum())
         return NULL;
     if(index <= 0 || index > drop_reason_max)

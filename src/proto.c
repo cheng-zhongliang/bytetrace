@@ -99,18 +99,21 @@ char* l4_proto_names[] = {
     [255] = "RAW",
 };
 
-static proto_item_t* proto_search(proto_item_t* protos, int size, char* name) {
+static proto_item_t* proto_search(proto_item_t* protos, int size, char* name)
+{
     proto_item_t* item;
     int i = 0;
 
-    for_each_protos(protos, size, i, item) {
+    for_each_protos(protos, size, i, item)
+    {
         if(strcmp(item->name, name) == 0)
             return item;
     }
     return NULL;
 }
 
-int l3proto2i(char* proto, int* dest) {
+int l3proto2i(char* proto, int* dest)
+{
     proto_item_t* item =
     proto_search(l3_protos, sizeof(l3_protos) / sizeof(l3_protos[0]), proto);
     if(item) {
@@ -120,7 +123,8 @@ int l3proto2i(char* proto, int* dest) {
     return -1;
 }
 
-int l4proto2i(char* proto, int* dest) {
+int l4proto2i(char* proto, int* dest)
+{
     proto_item_t* item =
     proto_search(l4_protos, sizeof(l4_protos) / sizeof(l4_protos[0]), proto);
     if(item) {
@@ -130,7 +134,8 @@ int l4proto2i(char* proto, int* dest) {
     return -1;
 }
 
-int proto2i(char* proto, int* dest) {
+int proto2i(char* proto, int* dest)
+{
     if(!l3proto2i(proto, dest))
         return 3;
     if(!l4proto2i(proto, dest))

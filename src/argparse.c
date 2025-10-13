@@ -9,12 +9,14 @@
 #define OPT_UNSET 1
 #define OPT_LONG (1 << 1)
 
-static const char* prefix_skip(const char* str, const char* prefix) {
+static const char* prefix_skip(const char* str, const char* prefix)
+{
     size_t len = strlen(prefix);
     return strncmp(str, prefix, len) ? NULL : str + len;
 }
 
-static int prefix_cmp(const char* str, const char* prefix) {
+static int prefix_cmp(const char* str, const char* prefix)
+{
     for(;; str++, prefix++)
         if(!*prefix) {
             return 0;
@@ -26,7 +28,8 @@ static int prefix_cmp(const char* str, const char* prefix) {
 static void argparse_error(struct argparse* self,
 const struct argparse_option* opt,
 const char* reason,
-int flags) {
+int flags)
+{
     (void)self;
     if(flags & OPT_LONG) {
         fprintf(stderr, "error: option `--%s` %s\n", opt->long_name, reason);
@@ -36,7 +39,8 @@ int flags) {
     exit(EXIT_FAILURE);
 }
 
-static int argparse_getvalue(struct argparse* self, const struct argparse_option* opt, int flags) {
+static int argparse_getvalue(struct argparse* self, const struct argparse_option* opt, int flags)
+{
     const char* s = NULL;
     if(!opt->value)
         goto skipped;
@@ -111,7 +115,8 @@ skipped:
     return 0;
 }
 
-static void argparse_options_check(const struct argparse_option* options) {
+static void argparse_options_check(const struct argparse_option* options)
+{
     for(; options->type != ARGPARSE_OPT_END; options++) {
         switch(options->type) {
         case ARGPARSE_OPT_END:
@@ -126,7 +131,8 @@ static void argparse_options_check(const struct argparse_option* options) {
     }
 }
 
-static int argparse_short_opt(struct argparse* self, const struct argparse_option* options) {
+static int argparse_short_opt(struct argparse* self, const struct argparse_option* options)
+{
     for(; options->type != ARGPARSE_OPT_END; options++) {
         if(options->short_name == *self->optvalue) {
             self->optvalue = self->optvalue[1] ? self->optvalue + 1 : NULL;
@@ -136,7 +142,8 @@ static int argparse_short_opt(struct argparse* self, const struct argparse_optio
     return -2;
 }
 
-static int argparse_long_opt(struct argparse* self, const struct argparse_option* options) {
+static int argparse_long_opt(struct argparse* self, const struct argparse_option* options)
+{
     for(; options->type != ARGPARSE_OPT_END; options++) {
         const char* rest;
         int opt_flags = 0;
@@ -175,7 +182,8 @@ static int argparse_long_opt(struct argparse* self, const struct argparse_option
 int argparse_init(struct argparse* self,
 struct argparse_option* options,
 const char* const* usages,
-int flags) {
+int flags)
+{
     memset(self, 0, sizeof(*self));
     self->options = options;
     self->usages = usages;
@@ -185,12 +193,14 @@ int flags) {
     return 0;
 }
 
-void argparse_describe(struct argparse* self, const char* description, const char* epilog) {
+void argparse_describe(struct argparse* self, const char* description, const char* epilog)
+{
     self->description = description;
     self->epilog = epilog;
 }
 
-int argparse_parse(struct argparse* self, int argc, const char** argv) {
+int argparse_parse(struct argparse* self, int argc, const char** argv)
+{
     self->argc = argc - 1;
     self->argv = argv + 1;
     self->out = argv;
@@ -250,7 +260,8 @@ end:
     return self->cpidx + self->argc;
 }
 
-void argparse_usage(struct argparse* self) {
+void argparse_usage(struct argparse* self)
+{
     if(self->usages) {
         const char* const* usages = self->usages;
         fprintf(stdout, "Usage: %s\n", *usages++);
@@ -339,13 +350,15 @@ void argparse_usage(struct argparse* self) {
     }
 }
 
-int argparse_help_cb_no_exit(struct argparse* self, const struct argparse_option* option) {
+int argparse_help_cb_no_exit(struct argparse* self, const struct argparse_option* option)
+{
     (void)option;
     argparse_usage(self);
     return 0;
 }
 
-int argparse_help_cb(struct argparse* self, const struct argparse_option* option) {
+int argparse_help_cb(struct argparse* self, const struct argparse_option* option)
+{
     argparse_help_cb_no_exit(self, option);
     exit(EXIT_SUCCESS);
 }

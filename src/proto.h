@@ -5,7 +5,8 @@
 
 extern char* l4_proto_names[];
 
-static inline char* i2l4(uint8_t num) {
+static inline char* i2l4(uint8_t num)
+{
     return l4_proto_names[num];
 }
 

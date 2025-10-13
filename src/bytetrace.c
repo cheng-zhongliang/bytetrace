@@ -13,7 +13,8 @@
 
 static volatile sig_atomic_t g_running = 1;
 
-static int set_log_level(struct argparse* self, const struct argparse_option* option) {
+static int set_log_level(struct argparse* self, const struct argparse_option* option)
+{
     int level = *(int*)option->value;
     switch(level) {
     case 0: level = LOG_TRACE; break;
@@ -29,13 +30,15 @@ static int set_log_level(struct argparse* self, const struct argparse_option* op
     return 0;
 }
 
-static int print_version(struct argparse* self, const struct argparse_option* option) {
+static int print_version(struct argparse* self, const struct argparse_option* option)
+{
     printf("version: %s\n", BYTETRACE_VERSION);
     exit(0);
     return 0;
 }
 
-static int parse_iface(struct argparse* self, const struct argparse_option* option) {
+static int parse_iface(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* iface = *(char**)option->value;
     int rc;
@@ -46,7 +49,8 @@ static int parse_iface(struct argparse* self, const struct argparse_option* opti
     return 0;
 }
 
-static int parse_src_ip(struct argparse* self, const struct argparse_option* option) {
+static int parse_src_ip(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* ip = *(char**)option->value;
     int rc;
@@ -57,7 +61,8 @@ static int parse_src_ip(struct argparse* self, const struct argparse_option* opt
     return 0;
 }
 
-static int parse_dst_ip(struct argparse* self, const struct argparse_option* option) {
+static int parse_dst_ip(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* ip = *(char**)option->value;
     int rc;
@@ -68,7 +73,8 @@ static int parse_dst_ip(struct argparse* self, const struct argparse_option* opt
     return 0;
 }
 
-static int parse_src_ip6(struct argparse* self, const struct argparse_option* option) {
+static int parse_src_ip6(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* ip = *(char**)option->value;
     int rc;
@@ -79,7 +85,8 @@ static int parse_src_ip6(struct argparse* self, const struct argparse_option* op
     return 0;
 }
 
-static int parse_dst_ip6(struct argparse* self, const struct argparse_option* option) {
+static int parse_dst_ip6(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* ip = *(char**)option->value;
     int rc;
@@ -90,7 +97,8 @@ static int parse_dst_ip6(struct argparse* self, const struct argparse_option* op
     return 0;
 }
 
-static int parse_src_mac(struct argparse* self, const struct argparse_option* option) {
+static int parse_src_mac(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* mac = *(char**)option->value;
     int rc;
@@ -103,7 +111,8 @@ static int parse_src_mac(struct argparse* self, const struct argparse_option* op
     return 0;
 }
 
-static int parse_dst_mac(struct argparse* self, const struct argparse_option* option) {
+static int parse_dst_mac(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* mac = *(char**)option->value;
     int rc;
@@ -116,7 +125,8 @@ static int parse_dst_mac(struct argparse* self, const struct argparse_option* op
     return 0;
 }
 
-static int parse_l3_proto(struct argparse* self, const struct argparse_option* option) {
+static int parse_l3_proto(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* proto = *(char**)option->value;
     int rc;
@@ -127,7 +137,8 @@ static int parse_l3_proto(struct argparse* self, const struct argparse_option* o
     return 0;
 }
 
-static int parse_l4_proto(struct argparse* self, const struct argparse_option* option) {
+static int parse_l4_proto(struct argparse* self, const struct argparse_option* option)
+{
     struct trace_context* ctx = (struct trace_context*)option->data;
     char* proto = *(char**)option->value;
     int rc;
@@ -138,7 +149,8 @@ static int parse_l4_proto(struct argparse* self, const struct argparse_option* o
     return 0;
 }
 
-static int parse_args(struct trace_context* ctx, int argc, char** argv) {
+static int parse_args(struct trace_context* ctx, int argc, char** argv)
+{
     int log_level;
     char* iface;
     char* src_mac;
@@ -198,12 +210,14 @@ static int parse_args(struct trace_context* ctx, int argc, char** argv) {
     return 0;
 }
 
-static void sig_handler(int sig) {
+static void sig_handler(int sig)
+{
     (void)sig;
     g_running = 0;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     struct trace_context ctx = { 0 };
     int rc;
 

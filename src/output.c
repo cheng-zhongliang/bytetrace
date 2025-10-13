@@ -31,7 +31,8 @@ static print_fn print_fns[] = {
     print_location,
 };
 
-void print_event(struct event* e) {
+void print_event(struct event* e)
+{
     char buf[1024] = { 0 };
     int length = sizeof(buf);
     int offset = 0;
@@ -55,7 +56,8 @@ void print_event(struct event* e) {
     printf("%s\n", buf);
 }
 
-int print_dev(char* buf, int length, struct event* e) {
+int print_dev(char* buf, int length, struct event* e)
+{
     char* dev;
     int n;
 
@@ -73,7 +75,8 @@ int print_dev(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_length(char* buf, int length, struct event* e) {
+int print_length(char* buf, int length, struct event* e)
+{
     int n;
 
     n = snprintf(buf, length, "length %u", e->length);
@@ -84,7 +87,8 @@ int print_length(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_mac(char* buf, int length, struct event* e) {
+int print_mac(char* buf, int length, struct event* e)
+{
     int n;
 
     n = snprintf(buf, length, "mac %02x:%02x:%02x:%02x:%02x:%02x > %02x:%02x:%02x:%02x:%02x:%02x",
@@ -98,7 +102,8 @@ int print_mac(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_vlan(char* buf, int length, struct event* e) {
+int print_vlan(char* buf, int length, struct event* e)
+{
     int n;
 
     n = snprintf(buf, length, "vlan %u pri %u", e->vlan_id, e->vlan_prio);
@@ -109,7 +114,8 @@ int print_vlan(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_l3_protocol(char* buf, int length, struct event* e) {
+int print_l3_protocol(char* buf, int length, struct event* e)
+{
     int n;
 
     if(e->l3_proto == 0x0800) {
@@ -127,7 +133,8 @@ int print_l3_protocol(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_ip(char* buf, int length, struct event* e) {
+int print_ip(char* buf, int length, struct event* e)
+{
     char src[INET6_ADDRSTRLEN] = { 0 };
     char dst[INET6_ADDRSTRLEN] = { 0 };
     int n;
@@ -150,7 +157,8 @@ int print_ip(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_l4_protocol(char* buf, int length, struct event* e) {
+int print_l4_protocol(char* buf, int length, struct event* e)
+{
     int n;
 
     if(e->l4_proto == 6) {
@@ -168,7 +176,8 @@ int print_l4_protocol(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_port(char* buf, int length, struct event* e) {
+int print_port(char* buf, int length, struct event* e)
+{
     int n;
 
     if(e->l4_proto != 6 && e->l4_proto != 17) {
@@ -183,7 +192,8 @@ int print_port(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_reason(char* buf, int length, struct event* e) {
+int print_reason(char* buf, int length, struct event* e)
+{
     char* reason;
     int n;
 
@@ -202,7 +212,8 @@ int print_reason(char* buf, int length, struct event* e) {
     return n;
 }
 
-int print_location(char* buf, int length, struct event* e) {
+int print_location(char* buf, int length, struct event* e)
+{
     struct loc_result location = { 0 };
     int n;
 

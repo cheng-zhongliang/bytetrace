@@ -32,7 +32,8 @@ static const char* level_colors[] = { "\x1b[94m", "\x1b[36m", "\x1b[32m",
     "\x1b[33m", "\x1b[31m", "\x1b[35m" };
 #endif
 
-static void stdout_callback(log_Event* ev) {
+static void stdout_callback(log_Event* ev)
+{
     char buf[16];
     buf[strftime(buf, sizeof(buf), "%H:%M:%S", ev->time)] = '\0';
 #ifdef LOG_USE_COLOR
@@ -47,15 +48,18 @@ static void stdout_callback(log_Event* ev) {
     fflush(ev->udata);
 }
 
-void log_set_level(int level) {
+void log_set_level(int level)
+{
     L.level = level;
 }
 
-void log_set_quiet(bool enable) {
+void log_set_quiet(bool enable)
+{
     L.quiet = enable;
 }
 
-static void init_event(log_Event* ev, void* udata) {
+static void init_event(log_Event* ev, void* udata)
+{
     if(!ev->time) {
         time_t t = time(NULL);
         ev->time = localtime(&t);
@@ -63,7 +67,8 @@ static void init_event(log_Event* ev, void* udata) {
     ev->udata = udata;
 }
 
-void log_log(int level, const char* file, int line, const char* fmt, ...) {
+void log_log(int level, const char* file, int line, const char* fmt, ...)
+{
     log_Event ev = {
         .fmt = fmt,
         .file = file,
