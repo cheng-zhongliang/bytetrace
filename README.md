@@ -9,7 +9,7 @@
 `bytetrace` is a light-weight dynamic tracer for linux packet drops. It helps you to locate the kernel function and reason for packet drops in a simple and efficient way.
 
 > [!NOTE]
-> IPV6 is not supported yet, but it will be added in the future.
+> IPV6 is supported.
 
 ## Features
 
@@ -27,34 +27,39 @@ To start using `bytetrace`, just run the following command:
 
 ```sh
 $ git clone https://github.com/cheng-zhongliang/bytetrace.git
-$ cd bytetrace
+$ cd bytetrace/src
 $ make
 ```
 
 ### Usage
 
 ```
-$ bytetrace -h
-Light-weight Dynamic Tracer for Linux Packet Drop
+$ ./bytetrace -h
+Light-weight Dynamic Tracer for Linux Network Stack
 
-Usage:
-  bytetrace [flags] <args>
+Basic options
+    -b, --btf=<str>           set BTF path
+    -l, --log-level=<int>     set log level (0-4)
+    -v, --version             show version information and exit
+    -h, --help                show this help message and exit
 
-Flags:
-  -p, --proto string       l3/l4 protocol
-  -s, --saddr ip           source address
-  -d, --daddr ip           destination address
-  -S, --sport uint16       source port
-  -D, --dport uint16       destination port
-  -V, --vlan uint16        VLAN ID
-  -i, --interface string   interface name
-  -r, --valid-reason       valid drop reason
-  -b, --btf string         BTF file path
-  -k, --stack              stack trace
-  -v, --verbose            verbose output
-  -c, --color              output with color
-  -h, --help               help for bytetrace
-      --version            version for bytetrace
+Filter options
+    --iface=<str>             set interface filter
+    --length=<int>            set packet length filter
+    --src-mac=<str>           set source MAC filter
+    --dst-mac=<str>           set destination MAC filter
+    --vlan-id=<int>           set VLAN ID filter
+    --vlan-prio=<int>         set VLAN priority filter
+    --l3-proto=<str>          set L3 protocol filter
+    --src-ip=<str>            set source IP filter
+    --dst-ip=<str>            set destination IP filter
+    --src-ipv6=<str>          set source IPv6 filter
+    --dst-ipv6=<str>          set destination IPv6 filter
+    --l4-proto=<str>          set L4 protocol filter
+    --src-port=<int>          set source port filter
+    --dst-port=<int>          set destination port filter
+
+Report bugs to <cheng.zhongliang@h3c.com>
 ```
 
 ### Example
@@ -62,15 +67,11 @@ Flags:
 Trace icmp packet drops on interface `ens1f0np0`:
 
 ```sh
-$ bytetrace -i ens1f0np0 -p icmp -v
+$ bytetrace --iface=ens1f0np0 --l4-proto=icmp
 ```
 
 Output:
 
 ```
-+-----------+-------------+--------------+----------+-------+-------+--------------+----------------+
-| INTERFACE |   SOURCE    | DESTINATION  | PROTOCOL | SPORT | DPORT |   LOCATION   |     REASON     |
-+-----------+-------------+--------------+----------+-------+-------+--------------+----------------+
-| ens1f0np0 | 192.168.2.1 | 192.168.10.1 | icmp     |     0 |     0 | nft_do_chain | NETFILTER_DROP |
-+-----------+-------------+--------------+----------+-------+-------+--------------+----------------+
+dev enp0s3 length 84 mac 55:55:aa:00:12:02 > 09:10:87:3e:2d:3b vlan 0 pri 0 IP 39.156.70.37 > 10.0.2.15 ICMP reason NETFILTER_DROP location nft_do_chain
 ```
