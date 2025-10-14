@@ -15,7 +15,7 @@
 
 - Locate kernel packet drop reason and function
 - Filter by interface, protocol, ip, port, etc.
-- Dump packet drop call stack
+- ~~Dump packet drop call stack~~
 - Cross-platform support (Linux)
 - Easy to use and deploy
 
