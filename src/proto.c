@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <string.h>
 
 typedef struct {
@@ -114,10 +115,11 @@ static proto_item_t* proto_search(proto_item_t* protos, int size, char* name)
 
 int l3proto2i(char* proto, int* dest)
 {
+    uint16_t* u16_dest = (uint16_t*)dest;
     proto_item_t* item =
     proto_search(l3_protos, sizeof(l3_protos) / sizeof(l3_protos[0]), proto);
     if(item) {
-        *dest = item->val;
+        *u16_dest = item->val;
         return 0;
     }
     return -1;
@@ -125,10 +127,11 @@ int l3proto2i(char* proto, int* dest)
 
 int l4proto2i(char* proto, int* dest)
 {
+    uint8_t* u8_dest = (uint8_t*)dest;
     proto_item_t* item =
     proto_search(l4_protos, sizeof(l4_protos) / sizeof(l4_protos[0]), proto);
     if(item) {
-        *dest = item->val;
+        *u8_dest = item->val;
         return 0;
     }
     return -1;
