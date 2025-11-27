@@ -203,6 +203,7 @@ static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct
             return -1;
         }
         ev->l3_proto = BPF_CORE_READ(skb, protocol);
+        ev->l3_proto = bpf_ntohs(ev->l3_proto);
         if(!ev->l3_proto) {
             return -1;
         }
