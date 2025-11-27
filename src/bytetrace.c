@@ -135,7 +135,7 @@ static int parse_l3_proto(struct argparse* self, const struct argparse_option* o
     char* proto = *(char**)option->value;
     int rc;
     rc = proto2i(proto, (int*)(&ctx->opt.l3_proto));
-    if(rc == 0) {
+    if(rc != 3) {
         return -2;
     }
     return 0;
@@ -147,7 +147,7 @@ static int parse_l4_proto(struct argparse* self, const struct argparse_option* o
     char* proto = *(char**)option->value;
     int rc;
     rc = proto2i(proto, (int*)(&ctx->opt.l4_proto));
-    if(rc == 0) {
+    if(rc != 4) {
         return -2;
     }
     return 0;
