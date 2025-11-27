@@ -207,9 +207,12 @@ static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct
         if(!ev->l3_proto) {
             return -1;
         }
+        if(opt->l3_proto && ev->l3_proto != opt->l3_proto) {
+            return -1;
+        }
         pos = head + network_header;
         return parse_l3(pos, opt, ev);
-    } else if(mac_header && mac_header >= network_header) {
+    } else if(mac_header >= network_header) {
         return -1;
     } else {
         pos = head + mac_header;
