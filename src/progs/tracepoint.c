@@ -14,6 +14,11 @@
 #define VLAN_PRIO_SHIFT 13
 #define VLAN_VID_MASK 0x0fff
 
+#define ETH_P_8021Q 0x8100
+#define ETH_P_8021AD 0x88a8
+
+#define SKB_MAC_HEADER_INVALID ((u16)~0U)
+
 struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __type(value, struct option);
@@ -141,12 +146,29 @@ static __always_inline int parse_l2(void* pos, struct option* opt, struct event*
         }
     }
 
+    pos += sizeof(eth);
+
     ev->l3_proto = bpf_ntohs(eth.h_proto);
+    if(ev->l3_proto == ETH_P_8021Q || ev->l3_proto == ETH_P_8021AD) {
+        struct vlan_hdr vh;
+        bpf_probe_read_kernel(&vh, sizeof(vh), pos);
+
+        u16 tci = bpf_ntohs(vh.h_vlan_TCI);
+        ev->vlan_id = tci & VLAN_VID_MASK;
+        ev->vlan_prio = (tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
+        ev->l3_proto = bpf_ntohs(vh.h_vlan_encapsulated_proto);
+        pos += sizeof(vh);
+    }
+
+    if(opt->vlan_id && ev->vlan_id != opt->vlan_id) {
+        return -1;
+    }
+    if(opt->vlan_prio && ev->vlan_prio != opt->vlan_prio) {
+        return -1;
+    }
     if(opt->l3_proto && ev->l3_proto != opt->l3_proto) {
         return -1;
     }
-
-    pos += sizeof(eth);
 
     return parse_l3(pos, opt, ev);
 }
@@ -154,10 +176,9 @@ static __always_inline int parse_l2(void* pos, struct option* opt, struct event*
 static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct event* ev)
 {
     struct net_device* dev;
-    void *pos, *head;
     u16 mac_header;
-    u8 vlan_all;
-    u16 vlan_tci;
+    u16 network_header;
+    void *head, *pos;
 
     dev = BPF_CORE_READ(skb, dev);
     bpf_probe_read_kernel_str(ev->iface, sizeof(ev->iface), dev->name);
@@ -173,24 +194,26 @@ static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct
         return -1;
     }
 
-    vlan_all = BPF_CORE_READ(skb, vlan_all);
-    if(vlan_all) {
-        vlan_tci = BPF_CORE_READ(skb, vlan_tci);
-        ev->vlan_id = vlan_tci & VLAN_VID_MASK;
-        ev->vlan_prio = (vlan_tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
-    }
-    if(opt->vlan_id && ev->vlan_id != opt->vlan_id) {
-        return -1;
-    }
-    if(opt->vlan_prio && ev->vlan_prio != opt->vlan_prio) {
-        return -1;
-    }
-
     head = BPF_CORE_READ(skb, head);
     mac_header = BPF_CORE_READ(skb, mac_header);
-    pos = head + mac_header;
+    network_header = BPF_CORE_READ(skb, network_header);
 
-    return parse_l2(pos, opt, ev);
+    if(!mac_header || mac_header == SKB_MAC_HEADER_INVALID) {
+        if(!network_header) {
+            return -1;
+        }
+        ev->l3_proto = BPF_CORE_READ(skb, protocol);
+        if(!ev->l3_proto) {
+            return -1;
+        }
+        pos = head + network_header;
+        return parse_l3(pos, opt, ev);
+    } else if(mac_header && mac_header >= network_header) {
+        return -1;
+    } else {
+        pos = head + mac_header;
+        return parse_l2(pos, opt, ev);
+    }
 }
 
 static __always_inline int trace(struct sk_buff* skb, struct option* opt, struct event* ev)
