@@ -3,3 +3,5 @@ bytetrace
 vmlinux.h
 tracepoint
 tracepoint.h
+compile_commands.json
+.cache/
