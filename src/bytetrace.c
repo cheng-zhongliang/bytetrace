@@ -164,6 +164,7 @@ static int parse_ratelimit(struct argparse* self, const struct argparse_option* 
     if(rc != 2) {
         return -2;
     }
+    rate = rate * BYE_MSG_TOKENS;
     rate_limit_init(&ctx->rl, rate, burst);
     return 0;
 }
@@ -186,7 +187,7 @@ static int parse_args(struct trace_context* ctx, int argc, char** argv)
         OPT_INTEGER('l', "log-level", &log_level, "set log level (0-4)", set_log_level, 0, 0),
         OPT_BOOLEAN('v', "version", NULL, "show version information and exit",
         print_version, 0, OPT_NONEG),
-        OPT_STRING('r', "ratelimit", &rl, "set output rate limit (e.g., 60,1)",
+        OPT_STRING('r', "ratelimit", &rl, "rate limit (1,1 means 1 msg/sec with burst 1)",
         parse_ratelimit, (intptr_t)ctx, 0),
         OPT_HELP(),
         OPT_GROUP("Filter options"),

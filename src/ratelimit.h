@@ -4,13 +4,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define BYE_MSG_TOKENS 60
+
 struct rate_limit {
     unsigned int rate;
     unsigned int burst;
 
     unsigned int tokens;
-    uint64_t last_fill;
-    uint64_t first_dropped;
+    unsigned int last_fill;
+    unsigned int first_dropped;
     unsigned int n_dropped;
 };
 
