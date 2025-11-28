@@ -4,13 +4,21 @@
 
 #include "log.h"
 #include "output.h"
+#include "ratelimit.h"
 #include "share.h"
+#include "time.h"
 #include "trace.h"
 #include "tracepoint.h"
 
 static int on_recv(void* ctx, void* data, size_t size)
 {
+    struct trace_context* c = (struct trace_context*)ctx;
     struct event* e = (struct event*)data;
+
+    if(!rate_limit_check(&c->rl)) {
+        return 0;
+    }
+
     print_event(e);
     return 0;
 }
@@ -21,7 +29,7 @@ int setup_event_listen(struct trace_context* ctx)
 
     fd = bpf_map__fd(ctx->events_map);
 
-    ctx->rb = ring_buffer__new(fd, on_recv, NULL, NULL);
+    ctx->rb = ring_buffer__new(fd, on_recv, ctx, NULL);
     if(ctx->rb == NULL) {
         log_error("Failed to open ring buffer: %s", strerror(errno));
         return -1;
@@ -90,6 +98,7 @@ int trace_poll(struct trace_context* ctx, int timeout_ms)
         log_error("Error polling perf buffer: %s", strerror(errno));
         return -1;
     }
+    increment_time_cache(timeout_ms);
     return 0;
 }
 

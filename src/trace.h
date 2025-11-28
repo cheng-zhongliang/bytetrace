@@ -6,6 +6,7 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+#include "ratelimit.h"
 #include "share.h"
 
 struct trace_context {
@@ -17,6 +18,7 @@ struct trace_context {
     struct bpf_map* options_map;
     const char* btf_path;
     struct option opt;
+    struct rate_limit rl;
 };
 
 int trace_init(struct trace_context* ctx);
