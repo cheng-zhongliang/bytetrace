@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BYE_MSG_TOKENS 60
-
 struct rate_limit {
     unsigned int rate;
     unsigned int burst;

@@ -5,6 +5,8 @@
 #include "ratelimit.h"
 #include "time.h"
 
+#define BYE_MSG_TOKENS 60
+
 #ifndef MIN
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 #endif

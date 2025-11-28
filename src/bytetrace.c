@@ -153,19 +153,10 @@ static int parse_l4_proto(struct argparse* self, const struct argparse_option* o
     return 0;
 }
 
-static int parse_ratelimit(struct argparse* self, const struct argparse_option* option)
+static int set_ratelimit(struct argparse* self, const struct argparse_option* option)
 {
     struct trace_context* ctx = (struct trace_context*)option->data;
-    char* rl = *(char**)option->value;
-    int rc;
-    unsigned int rate;
-    unsigned int burst;
-    rc = sscanf(rl, "%u,%u", &rate, &burst);
-    if(rc != 2) {
-        return -2;
-    }
-    rate = rate * BYE_MSG_TOKENS;
-    rate_limit_init(&ctx->rl, rate, burst);
+    rate_limit_init(&ctx->rl, 60, 1);
     return 0;
 }
 
@@ -179,7 +170,6 @@ static int parse_args(struct trace_context* ctx, int argc, char** argv)
     char* dst_ip;
     char* l3_proto;
     char* l4_proto;
-    char* rl;
 
     struct argparse_option options[] = {
         OPT_GROUP("Basic options"),
@@ -187,8 +177,8 @@ static int parse_args(struct trace_context* ctx, int argc, char** argv)
         OPT_INTEGER('l', "log-level", &log_level, "set log level (0-4)", set_log_level, 0, 0),
         OPT_BOOLEAN('v', "version", NULL, "show version information and exit",
         print_version, 0, OPT_NONEG),
-        OPT_STRING('r', "ratelimit", &rl, "set rate limit (1,1 means 1 msg/sec with burst 1)",
-        parse_ratelimit, (intptr_t)ctx, 0),
+        OPT_BOOLEAN('r', "ratelimit", NULL, "set output rate limit",
+        set_ratelimit, (intptr_t)ctx, OPT_NONEG),
         OPT_HELP(),
         OPT_GROUP("Filter options"),
         OPT_STRING('\0', "iface", &iface, "set interface filter", parse_iface,
