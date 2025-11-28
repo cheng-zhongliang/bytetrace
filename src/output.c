@@ -1,23 +1,9 @@
 #include <arpa/inet.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 #include "dropreason.h"
 #include "kallsyms.h"
 #include "output.h"
-
-#define COLOR_RESET "\033[0m"
-#define COLOR_BOLD "\033[1m"
-#define COLOR_BLACK "\033[90m"
-#define COLOR_RED "\033[91m"
-#define COLOR_GREEN "\033[32m"
-#define COLOR_YELLOW "\033[33m"
-#define COLOR_BLUE "\033[34m"
-#define COLOR_MAGENTA "\033[95m"
-#define COLOR_CYAN "\033[36m"
 
 typedef int (*print_fn)(char* buf, int length, struct event* e);
 
@@ -45,17 +31,24 @@ static print_fn print_fns[] = {
     print_location,
 };
 
-static bool color_enabled = false;
-
 struct format_strings {
     const char* dev_fmt;
     const char* length_fmt;
     const char* mac_fmt;
     const char* vlan_fmt;
+    const char* l3_ip_fmt;
+    const char* l3_ipv6_fmt;
+    const char* l3_proto_fmt;
     const char* ip_fmt;
+    const char* l4_tcp_fmt;
+    const char* l4_udp_fmt;
+    const char* l4_icmp_fmt;
+    const char* l4_icmpv6_fmt;
     const char* port_fmt;
     const char* reason_fmt;
+    const char* reason_num_fmt;
     const char* location_fmt;
+    const char* location_hex_fmt;
 };
 
 static struct format_strings fmt_color = {
@@ -66,67 +59,26 @@ static struct format_strings fmt_color = {
     "\033[34m%02x:%02x:%02x:%02x:%02x:%02x\033[0m",
     .vlan_fmt = "\033[90mvlan\033[0m \033[95m%u\033[0m \033[90mpri\033[0m "
                 "\033[95m%u\033[0m",
+    .l3_ip_fmt = "\033[96mIP\033[0m",
+    .l3_ipv6_fmt = "\033[96mIPv6\033[0m",
+    .l3_proto_fmt = "\033[96mproto 0x%x\033[0m",
     .ip_fmt = "\033[32m%s\033[0m > \033[32m%s\033[0m",
+    .l4_tcp_fmt = "\033[94mTCP\033[0m",
+    .l4_udp_fmt = "\033[94mUDP\033[0m",
+    .l4_icmp_fmt = "\033[94mICMP\033[0m",
+    .l4_icmpv6_fmt = "\033[94mICMPv6\033[0m",
     .port_fmt = "\033[33m%u\033[0m > \033[33m%u\033[0m",
     .reason_fmt = "\033[90mreason\033[0m \033[1m\033[91m%s\033[0m",
+    .reason_num_fmt = "\033[90mreason\033[0m \033[1m\033[91m%d\033[0m",
     .location_fmt = "\033[90mlocation\033[0m \033[1m\033[95m%s\033[0m",
+    .location_hex_fmt = "\033[90mlocation\033[0m \033[1m\033[95m0x%lx\033[0m",
 };
-
-static struct format_strings fmt_plain = {
-    .dev_fmt = "dev %s",
-    .length_fmt = "length %u",
-    .mac_fmt =
-    "mac %02x:%02x:%02x:%02x:%02x:%02x > %02x:%02x:%02x:%02x:%02x:%02x",
-    .vlan_fmt = "vlan %u pri %u",
-    .ip_fmt = "%s > %s",
-    .port_fmt = "%u > %u",
-    .reason_fmt = "reason %s",
-    .location_fmt = "location %s",
-};
-
-static struct format_strings* fmt = &fmt_plain;
-
-static void init_color_support(void)
-{
-    static bool initialized = false;
-    if(initialized) {
-        return;
-    }
-    initialized = true;
-
-    if(!isatty(STDOUT_FILENO)) {
-        color_enabled = false;
-        fmt = &fmt_plain;
-        return;
-    }
-
-    const char* term = getenv("TERM");
-    const char* no_color = getenv("NO_COLOR");
-
-    if(no_color != NULL && no_color[0] != '\0') {
-        color_enabled = false;
-        fmt = &fmt_plain;
-        return;
-    }
-
-    if(term != NULL &&
-    (strstr(term, "color") != NULL || strstr(term, "xterm") != NULL ||
-    strstr(term, "screen") != NULL || strstr(term, "tmux") != NULL ||
-    strcmp(term, "linux") == 0)) {
-        color_enabled = true;
-        fmt = &fmt_color;
-    } else {
-        fmt = &fmt_plain;
-    }
-}
 
 void print_event(struct event* e)
 {
     char buf[1024] = { 0 };
     int length = sizeof(buf);
     int offset = 0;
-
-    init_color_support();
 
     for(int i = 0; i < sizeof(print_fns) / sizeof(print_fn); i++) {
         print_fn fn;
@@ -158,7 +110,7 @@ int print_dev(char* buf, int length, struct event* e)
         dev = "unknown";
     }
 
-    n = snprintf(buf, length, fmt->dev_fmt, dev);
+    n = snprintf(buf, length, fmt_color.dev_fmt, dev);
     if(n < 0 || n >= length) {
         return -1;
     }
@@ -170,7 +122,7 @@ int print_length(char* buf, int length, struct event* e)
 {
     int n;
 
-    n = snprintf(buf, length, fmt->length_fmt, e->length);
+    n = snprintf(buf, length, fmt_color.length_fmt, e->length);
     if(n < 0 || n >= length) {
         return -1;
     }
@@ -182,7 +134,7 @@ int print_mac(char* buf, int length, struct event* e)
 {
     int n;
 
-    n = snprintf(buf, length, fmt->mac_fmt, e->src_mac[0], e->src_mac[1],
+    n = snprintf(buf, length, fmt_color.mac_fmt, e->src_mac[0], e->src_mac[1],
     e->src_mac[2], e->src_mac[3], e->src_mac[4], e->src_mac[5], e->dst_mac[0],
     e->dst_mac[1], e->dst_mac[2], e->dst_mac[3], e->dst_mac[4], e->dst_mac[5]);
     if(n < 0 || n >= length) {
@@ -196,7 +148,7 @@ int print_vlan(char* buf, int length, struct event* e)
 {
     int n;
 
-    n = snprintf(buf, length, fmt->vlan_fmt, e->vlan_id, e->vlan_prio);
+    n = snprintf(buf, length, fmt_color.vlan_fmt, e->vlan_id, e->vlan_prio);
     if(n < 0 || n >= length) {
         return -1;
     }
@@ -209,12 +161,11 @@ int print_l3_protocol(char* buf, int length, struct event* e)
     int n;
 
     if(e->l3_proto == 0x0800) {
-        n = snprintf(buf, length, color_enabled ? "\033[96mIP\033[0m" : "IP");
+        n = snprintf(buf, length, "%s", fmt_color.l3_ip_fmt);
     } else if(e->l3_proto == 0x86dd) {
-        n = snprintf(buf, length, color_enabled ? "\033[96mIPv6\033[0m" : "IPv6");
+        n = snprintf(buf, length, "%s", fmt_color.l3_ipv6_fmt);
     } else {
-        n = snprintf(buf, length,
-        color_enabled ? "\033[96mproto 0x%x\033[0m" : "proto 0x%x", e->l3_proto);
+        n = snprintf(buf, length, fmt_color.l3_proto_fmt, e->l3_proto);
     }
 
     if(n < 0 || n >= length) {
@@ -240,7 +191,7 @@ int print_ip(char* buf, int length, struct event* e)
         return -1;
     }
 
-    n = snprintf(buf, length, fmt->ip_fmt, src, dst);
+    n = snprintf(buf, length, fmt_color.ip_fmt, src, dst);
     if(n < 0 || n >= length) {
         return -1;
     }
@@ -253,13 +204,13 @@ int print_l4_protocol(char* buf, int length, struct event* e)
     int n;
 
     if(e->l4_proto == 6) {
-        n = snprintf(buf, length, color_enabled ? "\033[94mTCP\033[0m" : "TCP");
+        n = snprintf(buf, length, "%s", fmt_color.l4_tcp_fmt);
     } else if(e->l4_proto == 17) {
-        n = snprintf(buf, length, color_enabled ? "\033[94mUDP\033[0m" : "UDP");
+        n = snprintf(buf, length, "%s", fmt_color.l4_udp_fmt);
     } else if(e->l4_proto == 1) {
-        n = snprintf(buf, length, color_enabled ? "\033[94mICMP\033[0m" : "ICMP");
+        n = snprintf(buf, length, "%s", fmt_color.l4_icmp_fmt);
     } else if(e->l4_proto == 58) {
-        n = snprintf(buf, length, color_enabled ? "\033[94mICMPv6\033[0m" : "ICMPv6");
+        n = snprintf(buf, length, "%s", fmt_color.l4_icmpv6_fmt);
     } else {
         return -1;
     }
@@ -279,7 +230,7 @@ int print_port(char* buf, int length, struct event* e)
         return -1;
     }
 
-    n = snprintf(buf, length, fmt->port_fmt, e->src_port, e->dst_port);
+    n = snprintf(buf, length, fmt_color.port_fmt, e->src_port, e->dst_port);
     if(n < 0 || n >= length) {
         return -1;
     }
@@ -295,11 +246,9 @@ int print_reason(char* buf, int length, struct event* e)
     reason = get_drop_reason(e->reason);
 
     if(reason) {
-        n = snprintf(buf, length, fmt->reason_fmt, reason);
+        n = snprintf(buf, length, fmt_color.reason_fmt, reason);
     } else {
-        const char* fmt_str =
-        color_enabled ? "\033[90mreason\033[0m \033[1m\033[91m%d\033[0m" : "reason %d";
-        n = snprintf(buf, length, fmt_str, e->reason);
+        n = snprintf(buf, length, fmt_color.reason_num_fmt, e->reason);
     }
 
     if(n < 0 || n >= length) {
@@ -317,12 +266,9 @@ int print_location(char* buf, int length, struct event* e)
     lookup_kas_sym((void*)e->location, &location);
 
     if(location.symbol) {
-        n = snprintf(buf, length, fmt->location_fmt, location.symbol);
+        n = snprintf(buf, length, fmt_color.location_fmt, location.symbol);
     } else {
-        const char* fmt_str = color_enabled ?
-        "\033[90mlocation\033[0m \033[1m\033[95m0x%lx\033[0m" :
-        "location 0x%lx";
-        n = snprintf(buf, length, fmt_str, e->location);
+        n = snprintf(buf, length, fmt_color.location_hex_fmt, e->location);
     }
 
     if(n < 0 || n >= length) {
