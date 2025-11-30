@@ -7,6 +7,7 @@
 
 typedef int (*print_fn)(char* buf, int length, struct event* e);
 
+int print_timestamp(char* buf, int length, struct event* e);
 int print_dev(char* buf, int length, struct event* e);
 int print_length(char* buf, int length, struct event* e);
 int print_mac(char* buf, int length, struct event* e);
@@ -19,6 +20,7 @@ int print_reason(char* buf, int length, struct event* e);
 int print_location(char* buf, int length, struct event* e);
 
 static print_fn print_fns[] = {
+    print_timestamp,
     print_dev,
     print_length,
     print_mac,
@@ -32,6 +34,7 @@ static print_fn print_fns[] = {
 };
 
 struct format_strings {
+    const char* timestamp_fmt;
     const char* dev_fmt;
     const char* length_fmt;
     const char* mac_fmt;
@@ -52,6 +55,7 @@ struct format_strings {
 };
 
 static struct format_strings fmt_color = {
+    .timestamp_fmt = "\033[90mtimestamp\033[0m \033[37m%lu\033[0m",
     .dev_fmt = "\033[90mdev\033[0m \033[36m%s\033[0m",
     .length_fmt = "\033[90mlength\033[0m \033[33m%u\033[0m",
     .mac_fmt =
@@ -97,6 +101,18 @@ void print_event(struct event* e)
     buf[offset - 1] = '\0';
 
     printf("%s\n", buf);
+}
+
+int print_timestamp(char* buf, int length, struct event* e)
+{
+    int n;
+
+    n = snprintf(buf, length, fmt_color.timestamp_fmt, e->timestamp);
+    if(n < 0 || n >= length) {
+        return -1;
+    }
+
+    return n;
 }
 
 int print_dev(char* buf, int length, struct event* e)

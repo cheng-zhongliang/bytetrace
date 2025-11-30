@@ -4,21 +4,13 @@
 
 #include "log.h"
 #include "output.h"
-#include "ratelimit.h"
 #include "share.h"
-#include "time.h"
 #include "trace.h"
 #include "tracepoint.h"
 
 static int on_recv(void* ctx, void* data, size_t size)
 {
-    struct trace_context* c = (struct trace_context*)ctx;
     struct event* e = (struct event*)data;
-
-    if(!rate_limit_check(&c->rl)) {
-        return 0;
-    }
-
     print_event(e);
     return 0;
 }

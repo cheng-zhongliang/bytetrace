@@ -19,6 +19,27 @@
 
 #define SKB_MAC_HEADER_INVALID ((u16)~0U)
 
+#define BYE_MSG_TOKENS 60
+
+#ifndef MIN
+#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
+#endif
+
+#ifndef MAX
+#define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
+#endif
+
+static inline u32 sat_add(u32 x, u32 y)
+{
+    u32 sum = x + y;
+    return sum >= x ? sum : ~0u;
+}
+
+static inline u32 sat_mul(u32 x, u32 y)
+{
+    return (!y ? 0 : x <= (~0u) / y ? x * y : ~0u);
+}
+
 struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __type(value, struct option);
@@ -30,6 +51,40 @@ struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 1 << 24);
 } events SEC(".maps");
+
+static __always_inline bool rl_allow(struct option* opt, u64 now)
+{
+    if(opt->rate == 0) {
+        return true;
+    }
+
+    if(opt->tokens < BYE_MSG_TOKENS) {
+        if(opt->last_fill > now) {
+            /* Last filled in the future?  Time must have gone backward, or
+             * 'opt' has not been used before. */
+            opt->tokens = opt->burst;
+        } else if(opt->last_fill < now) {
+            u64 delta_ns = now - opt->last_fill;
+            if(delta_ns >= 1000000000ULL) {
+                u64 seconds = delta_ns / 1000000000ULL;
+                u32 add = sat_mul(opt->rate, seconds);
+                u32 tokens = sat_add(opt->tokens, add);
+                opt->tokens = MIN(tokens, opt->burst);
+                opt->last_fill += seconds * 1000000000ULL;
+            }
+        }
+        if(opt->tokens < BYE_MSG_TOKENS) {
+            if(!opt->n_dropped) {
+                opt->first_dropped = now;
+            }
+            opt->n_dropped++;
+            return false;
+        }
+    }
+    opt->tokens -= BYE_MSG_TOKENS;
+
+    return true;
+}
 
 static __always_inline int parse_l4(void* pos, struct option* opt, struct event* ev)
 {
@@ -238,9 +293,14 @@ int trace_skb(struct trace_event_raw_kfree_skb* ctx)
     struct sk_buff* skb = ctx->skbaddr;
     struct option* opt;
     struct event* ev;
+    u64 now = bpf_ktime_get_ns();
 
     opt = bpf_map_lookup_elem(&options, &(u32){ 0 });
     if(!opt) {
+        return 0;
+    }
+
+    if(!rl_allow(opt, now)) {
         return 0;
     }
 
@@ -251,6 +311,7 @@ int trace_skb(struct trace_event_raw_kfree_skb* ctx)
 
     ev->reason = ctx->reason;
     ev->location = (u64)ctx->location;
+    ev->timestamp = now;
 
     return trace(skb, opt, ev);
 }

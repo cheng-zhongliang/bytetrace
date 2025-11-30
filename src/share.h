@@ -34,6 +34,12 @@ struct option {
     s_uint8 dst_ipv6_filter;
     s_uint16 src_port;
     s_uint16 dst_port;
+    s_uint32 rate;
+    s_uint32 burst;
+    s_uint32 tokens;
+    s_uint64 last_fill;
+    s_uint64 first_dropped;
+    s_uint32 n_dropped;
 };
 
 struct event {
@@ -55,6 +61,7 @@ struct event {
     s_uint32 stack_id;
     s_uint64 location;
     s_uint64 timestamp;
+    s_uint32 n_dropped;
 };
 
 #endif

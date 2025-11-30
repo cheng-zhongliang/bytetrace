@@ -156,7 +156,8 @@ static int parse_l4_proto(struct argparse* self, const struct argparse_option* o
 static int set_ratelimit(struct argparse* self, const struct argparse_option* option)
 {
     struct trace_context* ctx = (struct trace_context*)option->data;
-    rate_limit_init(&ctx->rl, 60, 1);
+    ctx->opt.rate = 60;
+    ctx->opt.burst = 60;
     return 0;
 }
 
