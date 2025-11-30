@@ -3,7 +3,6 @@
 
 #include "log.h"
 #include "ratelimit.h"
-#include "time.h"
 
 #define BYE_MSG_TOKENS 60
 
@@ -37,13 +36,13 @@ void rate_limit_init(struct rate_limit* rl, unsigned int rate, unsigned int burs
 
 bool rate_limit_check(struct rate_limit* rl)
 {
-    unsigned int now;
+    time_t now;
 
     if(rl->rate == 0) {
         return true;
     }
 
-    now = (unsigned int)(get_time_cache() / 1000);
+    now = time(NULL);
 
     if(rl->tokens < BYE_MSG_TOKENS) {
         if(rl->last_fill > now) {

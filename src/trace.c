@@ -98,7 +98,6 @@ int trace_poll(struct trace_context* ctx, int timeout_ms)
         log_error("Error polling perf buffer: %s", strerror(errno));
         return -1;
     }
-    increment_time_cache(timeout_ms);
     return 0;
 }
 

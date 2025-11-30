@@ -3,14 +3,15 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
 
 struct rate_limit {
     unsigned int rate;
     unsigned int burst;
 
     unsigned int tokens;
-    unsigned int last_fill;
-    unsigned int first_dropped;
+    time_t last_fill;
+    time_t first_dropped;
     unsigned int n_dropped;
 };
 
