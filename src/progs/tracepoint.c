@@ -283,6 +283,11 @@ static __always_inline int trace(struct sk_buff* skb, struct option* opt, struct
         return 0;
     }
 
+    if(!rl_allow(opt, ev->timestamp)) {
+        bpf_ringbuf_discard(ev, 0);
+        return 0;
+    }
+
     bpf_ringbuf_submit(ev, 0);
     return 0;
 }
@@ -293,14 +298,9 @@ int trace_skb(struct trace_event_raw_kfree_skb* ctx)
     struct sk_buff* skb = ctx->skbaddr;
     struct option* opt;
     struct event* ev;
-    u64 now = bpf_ktime_get_ns();
 
     opt = bpf_map_lookup_elem(&options, &(u32){ 0 });
     if(!opt) {
-        return 0;
-    }
-
-    if(!rl_allow(opt, now)) {
         return 0;
     }
 
@@ -311,7 +311,7 @@ int trace_skb(struct trace_event_raw_kfree_skb* ctx)
 
     ev->reason = ctx->reason;
     ev->location = (u64)ctx->location;
-    ev->timestamp = now;
+    ev->timestamp = bpf_ktime_get_ns();
 
     return trace(skb, opt, ev);
 }
