@@ -52,8 +52,10 @@ struct {
     __uint(max_entries, 1 << 24);
 } events SEC(".maps");
 
-static __always_inline bool rl_allow(struct option* opt, u64 now)
+static __always_inline bool rl_allow(struct option* opt, struct event* ev)
 {
+    u64 now = ev->timestamp;
+
     if(opt->rate == 0) {
         return true;
     }
@@ -74,10 +76,6 @@ static __always_inline bool rl_allow(struct option* opt, u64 now)
             }
         }
         if(opt->tokens < BYE_MSG_TOKENS) {
-            if(!opt->n_dropped) {
-                opt->first_dropped = now;
-            }
-            opt->n_dropped++;
             return false;
         }
     }
@@ -283,7 +281,7 @@ static __always_inline int trace(struct sk_buff* skb, struct option* opt, struct
         return 0;
     }
 
-    if(!rl_allow(opt, ev->timestamp)) {
+    if(!rl_allow(opt, ev)) {
         bpf_ringbuf_discard(ev, 0);
         return 0;
     }
