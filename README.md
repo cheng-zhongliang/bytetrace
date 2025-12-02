@@ -40,6 +40,7 @@ Light-weight Dynamic Tracer for Linux Network Stack
 Basic options
     -b, --btf=<str>           set BTF path
     -l, --log-level=<int>     set log level (0-4)
+    -r, --ratelimit           set output rate limit
     -v, --version             show version information and exit
     -h, --help                show this help message and exit
 
@@ -73,5 +74,5 @@ $ bytetrace --iface=ens1f0np0 --l4-proto=icmp
 Output:
 
 ```
-dev ens1f0np0 length 84 mac 55:55:aa:00:12:02 > 09:10:87:3e:2d:3b vlan 0 pri 0 IP 39.156.70.37 > 10.0.2.15 ICMP reason NETFILTER_DROP location nft_do_chain
+timestamp 9946005926979 dev ens1f0np0 length 84 mac 55:55:aa:00:12:02 > 09:10:87:3e:2d:3b vlan 0 pri 0 IP 39.156.70.37 > 10.0.2.15 ICMP reason NETFILTER_DROP location nft_do_chain
 ```
