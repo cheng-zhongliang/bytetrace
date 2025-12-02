@@ -1,7 +1,7 @@
 #ifndef __BYTETRACE_H__
 #define __BYTETRACE_H__
 
-#define BYTETRACE_VERSION "0.1.0"
+#define BYTETRACE_VERSION "0.2.0"
 
 #define BYTETRACE_DESCRIPTION \
     "Light-weight Dynamic Tracer for Linux Network Stack"
