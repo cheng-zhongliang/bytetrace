@@ -2,7 +2,6 @@
 #define __LOOKUP_KAS_H__
 
 #include <asm/types.h>
-#include <stdlib.h>
 
 struct loc_result {
     const char* symbol;

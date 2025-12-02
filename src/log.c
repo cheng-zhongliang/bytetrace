@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <time.h>
+
 #include "log.h"
 
 #ifndef LOG_USE_COLOR
