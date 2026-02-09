@@ -40,7 +40,7 @@ Light-weight Dynamic Tracer for Linux Network Stack
 Basic options
     -b, --btf=<str>           set BTF path
     -l, --log-level=<int>     set log level (0-4)
-    -r, --ratelimit           set output rate limit
+    -r, --ratelimit           enable output rate limit
     -v, --version             show version information and exit
     -h, --help                show this help message and exit
 
