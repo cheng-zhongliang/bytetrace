@@ -72,12 +72,12 @@ static int parse_dst_ip(struct argparse* self, const struct argparse_option* opt
     return 0;
 }
 
-static int parse_src_ip6(struct argparse* self, const struct argparse_option* option)
+static int parse_src_ipv6(struct argparse* self, const struct argparse_option* option)
 {
     struct trace_context* ctx = (struct trace_context*)option->data;
-    char* ip = *(char**)option->value;
+    char* ipv6 = *(char**)option->value;
     int rc;
-    rc = inet_pton(AF_INET6, ip, &ctx->opt.src_ipv6);
+    rc = inet_pton(AF_INET6, ipv6, &ctx->opt.src_ipv6);
     if(rc <= 0) {
         return -2;
     }
@@ -85,12 +85,12 @@ static int parse_src_ip6(struct argparse* self, const struct argparse_option* op
     return 0;
 }
 
-static int parse_dst_ip6(struct argparse* self, const struct argparse_option* option)
+static int parse_dst_ipv6(struct argparse* self, const struct argparse_option* option)
 {
     struct trace_context* ctx = (struct trace_context*)option->data;
-    char* ip = *(char**)option->value;
+    char* ipv6 = *(char**)option->value;
     int rc;
-    rc = inet_pton(AF_INET6, ip, &ctx->opt.dst_ipv6);
+    rc = inet_pton(AF_INET6, ipv6, &ctx->opt.dst_ipv6);
     if(rc <= 0) {
         return -2;
     }
@@ -168,14 +168,16 @@ static int parse_args(struct trace_context* ctx, int argc, char** argv)
     char* dst_mac;
     char* src_ip;
     char* dst_ip;
+    char* src_ipv6;
+    char* dst_ipv6;
     char* l3_proto;
     char* l4_proto;
 
     struct argparse_option options[] = {
         OPT_GROUP("Basic options"),
         OPT_STRING('b', "btf", &ctx->btf_path, "set BTF path", NULL, 0, 0),
-        OPT_INTEGER('l', "log-level", &log_level, "set log level (0-4)", set_log_level, 0, 0),
-        OPT_BOOLEAN('r', "ratelimit", NULL, "set output rate limit",
+        OPT_INTEGER('l', "log-level", &log_level, "set log level (0-5)", set_log_level, 0, 0),
+        OPT_BOOLEAN('r', "ratelimit", NULL, "enable output rate limit",
         set_ratelimit, (intptr_t)ctx, OPT_NONEG),
         OPT_BOOLEAN('v', "version", NULL, "show version information and exit",
         print_version, 0, OPT_NONEG),
@@ -197,10 +199,10 @@ static int parse_args(struct trace_context* ctx, int argc, char** argv)
         parse_src_ip, (intptr_t)ctx, 0),
         OPT_STRING('\0', "dst-ip", &dst_ip, "set destination IP filter",
         parse_dst_ip, (intptr_t)ctx, 0),
-        OPT_STRING('\0', "src-ipv6", &src_ip, "set source IPv6 filter",
-        parse_src_ip6, (intptr_t)ctx, 0),
-        OPT_STRING('\0', "dst-ipv6", &dst_ip, "set destination IPv6 filter",
-        parse_dst_ip6, (intptr_t)ctx, 0),
+        OPT_STRING('\0', "src-ipv6", &src_ipv6, "set source IPv6 filter",
+        parse_src_ipv6, (intptr_t)ctx, 0),
+        OPT_STRING('\0', "dst-ipv6", &dst_ipv6, "set destination IPv6 filter",
+        parse_dst_ipv6, (intptr_t)ctx, 0),
         OPT_STRING('\0', "l4-proto", &l4_proto, "set L4 protocol filter",
         parse_l4_proto, (intptr_t)ctx, 0),
         OPT_INTEGER('\0', "src-port", &ctx->opt.src_port,
