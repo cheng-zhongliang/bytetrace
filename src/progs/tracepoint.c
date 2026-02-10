@@ -16,10 +16,27 @@
 
 #define ETH_P_8021Q 0x8100
 #define ETH_P_8021AD 0x88a8
+#define ETH_P_IP 0x0800
+#define ETH_P_IPV6 0x86dd
+
+#define IPPROTO_ICMP 1
+#define IPPROTO_TCP 6
+#define IPPROTO_UDP 17
+#define IPPROTO_ICMPV6 58
 
 #define SKB_MAC_HEADER_INVALID ((u16)~0U)
 
 #define BYE_MSG_TOKENS 60
+
+#define FILTER_U32(target, filter_val)           \
+    if((filter_val) && (target) != (filter_val)) \
+    return -1
+
+#define FILTER_MEM(target, filter_val, flag_val)                    \
+    if(flag_val) {                                                  \
+        if(memcmp((target), (filter_val), sizeof(filter_val)) != 0) \
+            return -1;                                              \
+    }
 
 #ifndef MIN
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
@@ -54,18 +71,19 @@ struct {
 
 static __always_inline bool rl_allow(struct option* opt, struct event* ev)
 {
-    u64 now = ev->timestamp;
-
     if(opt->rate == 0) {
         return true;
     }
+
+    u64 now = ev->timestamp;
 
     if(opt->tokens < BYE_MSG_TOKENS) {
         if(opt->last_fill > now) {
             /* Last filled in the future?  Time must have gone backward, or
              * 'opt' has not been used before. */
             opt->tokens = opt->burst;
-        } else if(opt->last_fill < now) {
+            opt->last_fill = now;
+        } else {
             u64 delta_ns = now - opt->last_fill;
             if(delta_ns >= 1000000000ULL) {
                 u64 seconds = delta_ns / 1000000000ULL;
@@ -87,38 +105,32 @@ static __always_inline bool rl_allow(struct option* opt, struct event* ev)
 static __always_inline int parse_l4(void* pos, struct option* opt, struct event* ev)
 {
     switch(ev->l4_proto) {
-    case 6: {
+    case IPPROTO_TCP: {
         struct tcphdr tcph;
         bpf_probe_read_kernel(&tcph, sizeof(tcph), pos);
 
         ev->src_port = bpf_ntohs(tcph.source);
-        if(opt->src_port && ev->src_port != opt->src_port) {
-            return -1;
-        }
+        FILTER_U32(ev->src_port, opt->src_port);
+
         ev->dst_port = bpf_ntohs(tcph.dest);
-        if(opt->dst_port && ev->dst_port != opt->dst_port) {
-            return -1;
-        }
+        FILTER_U32(ev->dst_port, opt->dst_port);
 
         break;
     }
-    case 17: {
+    case IPPROTO_UDP: {
         struct udphdr udph;
         bpf_probe_read_kernel(&udph, sizeof(udph), pos);
 
         ev->src_port = bpf_ntohs(udph.source);
-        if(opt->src_port && ev->src_port != opt->src_port) {
-            return -1;
-        }
+        FILTER_U32(ev->src_port, opt->src_port);
+
         ev->dst_port = bpf_ntohs(udph.dest);
-        if(opt->dst_port && ev->dst_port != opt->dst_port) {
-            return -1;
-        }
+        FILTER_U32(ev->dst_port, opt->dst_port);
 
         break;
     }
-    case 1:
-    case 58:
+    case IPPROTO_ICMP:
+    case IPPROTO_ICMPV6:
     default: break;
     }
 
@@ -128,42 +140,30 @@ static __always_inline int parse_l4(void* pos, struct option* opt, struct event*
 static __always_inline int parse_l3(void* pos, struct option* opt, struct event* ev)
 {
     switch(ev->l3_proto) {
-    case 0x0800: {
+    case ETH_P_IP: {
         struct iphdr iph;
         bpf_probe_read_kernel(&iph, sizeof(iph), pos);
         ev->l4_proto = iph.protocol;
 
         ev->src_ip = iph.saddr;
-        if(opt->src_ip && ev->src_ip != opt->src_ip) {
-            return -1;
-        }
+        FILTER_U32(ev->src_ip, opt->src_ip);
+
         ev->dst_ip = iph.daddr;
-        if(opt->dst_ip && ev->dst_ip != opt->dst_ip) {
-            return -1;
-        }
+        FILTER_U32(ev->dst_ip, opt->dst_ip);
 
         pos += iph.ihl * 4;
         break;
     }
-    case 0x86dd: {
+    case ETH_P_IPV6: {
         struct ipv6hdr ip6h;
         bpf_probe_read_kernel(&ip6h, sizeof(ip6h), pos);
         ev->l4_proto = ip6h.nexthdr;
 
         memcpy(ev->src_ipv6, ip6h.saddr.in6_u.u6_addr8, sizeof(ip6h.saddr));
-        if(opt->src_ipv6_filter) {
-            int cmp = memcmp(ev->src_ipv6, opt->src_ipv6, sizeof(opt->src_ipv6));
-            if(cmp != 0) {
-                return -1;
-            }
-        }
+        FILTER_MEM(ev->src_ipv6, opt->src_ipv6, opt->src_ipv6_filter);
+
         memcpy(ev->dst_ipv6, ip6h.daddr.in6_u.u6_addr8, sizeof(ip6h.daddr));
-        if(opt->dst_ipv6_filter) {
-            int cmp = memcmp(ev->dst_ipv6, opt->dst_ipv6, sizeof(opt->dst_ipv6));
-            if(cmp != 0) {
-                return -1;
-            }
-        }
+        FILTER_MEM(ev->dst_ipv6, opt->dst_ipv6, opt->dst_ipv6_filter);
 
         pos += sizeof(ip6h);
         break;
@@ -171,9 +171,7 @@ static __always_inline int parse_l3(void* pos, struct option* opt, struct event*
     default: return 0;
     }
 
-    if(opt->l4_proto && ev->l4_proto != opt->l4_proto) {
-        return -1;
-    }
+    FILTER_U32(ev->l4_proto, opt->l4_proto);
 
     return parse_l4(pos, opt, ev);
 }
@@ -185,19 +183,10 @@ static __always_inline int parse_l2(void* pos, struct option* opt, struct event*
     bpf_probe_read_kernel(&eth, sizeof(eth), pos);
 
     memcpy(ev->dst_mac, eth.h_dest, sizeof(eth.h_dest));
-    if(opt->dst_mac_filter) {
-        int cmp = memcmp(ev->dst_mac, opt->dst_mac, sizeof(opt->dst_mac));
-        if(cmp != 0) {
-            return -1;
-        }
-    }
+    FILTER_MEM(ev->dst_mac, opt->dst_mac, opt->dst_mac_filter);
+
     memcpy(ev->src_mac, eth.h_source, sizeof(eth.h_source));
-    if(opt->src_mac_filter) {
-        int cmp = memcmp(ev->src_mac, opt->src_mac, sizeof(opt->src_mac));
-        if(cmp != 0) {
-            return -1;
-        }
-    }
+    FILTER_MEM(ev->src_mac, opt->src_mac, opt->src_mac_filter);
 
     pos += sizeof(eth);
 
@@ -213,15 +202,9 @@ static __always_inline int parse_l2(void* pos, struct option* opt, struct event*
         pos += sizeof(vh);
     }
 
-    if(opt->vlan_id && ev->vlan_id != opt->vlan_id) {
-        return -1;
-    }
-    if(opt->vlan_prio && ev->vlan_prio != opt->vlan_prio) {
-        return -1;
-    }
-    if(opt->l3_proto && ev->l3_proto != opt->l3_proto) {
-        return -1;
-    }
+    FILTER_U32(ev->vlan_id, opt->vlan_id);
+    FILTER_U32(ev->vlan_prio, opt->vlan_prio);
+    FILTER_U32(ev->l3_proto, opt->l3_proto);
 
     return parse_l3(pos, opt, ev);
 }
@@ -233,19 +216,12 @@ static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct
     u16 network_header;
     void *head, *pos;
 
+    ev->length = BPF_CORE_READ(skb, len);
+    FILTER_U32(ev->length, opt->length);
+
     dev = BPF_CORE_READ(skb, dev);
     bpf_probe_read_kernel_str(ev->iface, sizeof(ev->iface), dev->name);
-    if(opt->iface[0]) {
-        int cmp = memcmp(ev->iface, opt->iface, sizeof(opt->iface));
-        if(cmp != 0) {
-            return -1;
-        }
-    }
-
-    ev->length = BPF_CORE_READ(skb, len);
-    if(opt->length && ev->length != opt->length) {
-        return -1;
-    }
+    FILTER_MEM(ev->iface, opt->iface, opt->iface[0]);
 
     head = BPF_CORE_READ(skb, head);
     mac_header = BPF_CORE_READ(skb, mac_header);
@@ -260,9 +236,8 @@ static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct
         if(!ev->l3_proto) {
             return -1;
         }
-        if(opt->l3_proto && ev->l3_proto != opt->l3_proto) {
-            return -1;
-        }
+        FILTER_U32(ev->l3_proto, opt->l3_proto);
+
         pos = head + network_header;
         return parse_l3(pos, opt, ev);
     } else if(mac_header >= network_header) {
@@ -293,11 +268,12 @@ static __always_inline int trace(struct sk_buff* skb, struct option* opt, struct
 SEC("tracepoint/skb/kfree_skb")
 int trace_skb(struct trace_event_raw_kfree_skb* ctx)
 {
+    static const u32 zero_key = 0;
     struct sk_buff* skb = ctx->skbaddr;
     struct option* opt;
     struct event* ev;
 
-    opt = bpf_map_lookup_elem(&options, &(u32){ 0 });
+    opt = bpf_map_lookup_elem(&options, &zero_key);
     if(!opt) {
         return 0;
     }
