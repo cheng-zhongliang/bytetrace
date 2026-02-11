@@ -250,8 +250,7 @@ static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct
 
 static __always_inline int trace(struct sk_buff* skb, struct option* opt, struct event* ev)
 {
-    int rc = parse(skb, opt, ev);
-    if(rc != 0) {
+    if(parse(skb, opt, ev)) {
         bpf_ringbuf_discard(ev, 0);
         return 0;
     }
@@ -268,12 +267,11 @@ static __always_inline int trace(struct sk_buff* skb, struct option* opt, struct
 SEC("tracepoint/skb/kfree_skb")
 int trace_skb(struct trace_event_raw_kfree_skb* ctx)
 {
-    static const u32 zero_key = 0;
     struct sk_buff* skb = ctx->skbaddr;
     struct option* opt;
     struct event* ev;
 
-    opt = bpf_map_lookup_elem(&options, &zero_key);
+    opt = bpf_map_lookup_elem(&options, &(u32){ 0 });
     if(!opt) {
         return 0;
     }
