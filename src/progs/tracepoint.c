@@ -26,9 +26,10 @@
 
 #define SKB_MAC_HEADER_INVALID ((u16)~0U)
 
-#define BYE_MSG_TOKENS 60
+#define RL_TOKENS_PER_EVENT 60
+#define NSEC_PER_SEC 1000000000ULL
 
-#define FILTER_U32(target, filter_val)           \
+#define FILTER_EQ(target, filter_val)            \
     if((filter_val) && (target) != (filter_val)) \
     return -1
 
@@ -42,17 +43,13 @@
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 #endif
 
-#ifndef MAX
-#define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
-#endif
-
-static inline u32 sat_add(u32 x, u32 y)
+static __always_inline u32 sat_add(u32 x, u32 y)
 {
     u32 sum = x + y;
     return sum >= x ? sum : ~0u;
 }
 
-static inline u32 sat_mul(u32 x, u32 y)
+static __always_inline u32 sat_mul(u32 x, u32 y)
 {
     return (!y ? 0 : x <= (~0u) / y ? x * y : ~0u);
 }
@@ -69,66 +66,60 @@ struct {
     __uint(max_entries, 1 << 24);
 } events SEC(".maps");
 
+static __always_inline void rl_refill(struct option* opt, u64 now)
+{
+    /* last_fill in the future means time went backward or first use */
+    if(opt->last_fill > now) {
+        opt->tokens = opt->burst;
+        opt->last_fill = now;
+        return;
+    }
+
+    u64 delta_ns = now - opt->last_fill;
+    if(delta_ns >= NSEC_PER_SEC) {
+        u64 seconds = delta_ns / NSEC_PER_SEC;
+        u32 add = sat_mul(opt->rate, seconds);
+        u32 tokens = sat_add(opt->tokens, add);
+        opt->tokens = MIN(tokens, opt->burst);
+        opt->last_fill += seconds * NSEC_PER_SEC;
+    }
+}
+
 static __always_inline bool rl_allow(struct option* opt, struct event* ev)
 {
     if(opt->rate == 0) {
         return true;
     }
 
-    u64 now = ev->timestamp;
-
-    if(opt->tokens < BYE_MSG_TOKENS) {
-        if(opt->last_fill > now) {
-            /* Last filled in the future?  Time must have gone backward, or
-             * 'opt' has not been used before. */
-            opt->tokens = opt->burst;
-            opt->last_fill = now;
-        } else {
-            u64 delta_ns = now - opt->last_fill;
-            if(delta_ns >= 1000000000ULL) {
-                u64 seconds = delta_ns / 1000000000ULL;
-                u32 add = sat_mul(opt->rate, seconds);
-                u32 tokens = sat_add(opt->tokens, add);
-                opt->tokens = MIN(tokens, opt->burst);
-                opt->last_fill += seconds * 1000000000ULL;
-            }
-        }
-        if(opt->tokens < BYE_MSG_TOKENS) {
+    if(opt->tokens < RL_TOKENS_PER_EVENT) {
+        rl_refill(opt, ev->timestamp);
+        if(opt->tokens < RL_TOKENS_PER_EVENT) {
             return false;
         }
     }
-    opt->tokens -= BYE_MSG_TOKENS;
+    opt->tokens -= RL_TOKENS_PER_EVENT;
 
     return true;
 }
 
-static __always_inline int parse_l4(void* pos, struct option* opt, struct event* ev)
+static __always_inline int match_l4(void* pos, struct option* opt, struct event* ev)
 {
     switch(ev->l4_proto) {
-    case IPPROTO_TCP: {
-        struct tcphdr tcph;
-        bpf_probe_read_kernel(&tcph, sizeof(tcph), pos);
-
-        ev->src_port = bpf_ntohs(tcph.source);
-        FILTER_U32(ev->src_port, opt->src_port);
-
-        ev->dst_port = bpf_ntohs(tcph.dest);
-        FILTER_U32(ev->dst_port, opt->dst_port);
-
-        break;
-    }
+    case IPPROTO_TCP:
     case IPPROTO_UDP: {
-        struct udphdr udph;
-        bpf_probe_read_kernel(&udph, sizeof(udph), pos);
+        /* tcphdr and udphdr share the same source/dest layout at offset 0 */
+        struct udphdr h;
+        bpf_probe_read_kernel(&h, sizeof(h), pos);
 
-        ev->src_port = bpf_ntohs(udph.source);
-        FILTER_U32(ev->src_port, opt->src_port);
+        ev->src_port = bpf_ntohs(h.source);
+        FILTER_EQ(ev->src_port, opt->src_port);
 
-        ev->dst_port = bpf_ntohs(udph.dest);
-        FILTER_U32(ev->dst_port, opt->dst_port);
+        ev->dst_port = bpf_ntohs(h.dest);
+        FILTER_EQ(ev->dst_port, opt->dst_port);
 
         break;
     }
+    /* ICMP/ICMPv6: no port fields to match, accept as-is */
     case IPPROTO_ICMP:
     case IPPROTO_ICMPV6:
     default: break;
@@ -137,7 +128,7 @@ static __always_inline int parse_l4(void* pos, struct option* opt, struct event*
     return 0;
 }
 
-static __always_inline int parse_l3(void* pos, struct option* opt, struct event* ev)
+static __always_inline int match_l3(void* pos, struct option* opt, struct event* ev)
 {
     switch(ev->l3_proto) {
     case ETH_P_IP: {
@@ -146,10 +137,10 @@ static __always_inline int parse_l3(void* pos, struct option* opt, struct event*
         ev->l4_proto = iph.protocol;
 
         ev->src_ip = iph.saddr;
-        FILTER_U32(ev->src_ip, opt->src_ip);
+        FILTER_EQ(ev->src_ip, opt->src_ip);
 
         ev->dst_ip = iph.daddr;
-        FILTER_U32(ev->dst_ip, opt->dst_ip);
+        FILTER_EQ(ev->dst_ip, opt->dst_ip);
 
         pos += iph.ihl * 4;
         break;
@@ -171,15 +162,27 @@ static __always_inline int parse_l3(void* pos, struct option* opt, struct event*
     default: return 0;
     }
 
-    FILTER_U32(ev->l4_proto, opt->l4_proto);
+    FILTER_EQ(ev->l4_proto, opt->l4_proto);
 
-    return parse_l4(pos, opt, ev);
+    return match_l4(pos, opt, ev);
 }
 
-static __always_inline int parse_l2(void* pos, struct option* opt, struct event* ev)
+static __always_inline int parse_vlan(void* data, struct event* ev)
+{
+    struct vlan_hdr vh;
+    bpf_probe_read_kernel(&vh, sizeof(vh), data);
+
+    u16 tci = bpf_ntohs(vh.h_vlan_TCI);
+    ev->vlan_id = tci & VLAN_VID_MASK;
+    ev->vlan_prio = (tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
+    ev->l3_proto = bpf_ntohs(vh.h_vlan_encapsulated_proto);
+
+    return sizeof(vh);
+}
+
+static __always_inline int match_l2(void* pos, struct option* opt, struct event* ev)
 {
     struct ethhdr eth;
-
     bpf_probe_read_kernel(&eth, sizeof(eth), pos);
 
     memcpy(ev->dst_mac, eth.h_dest, sizeof(eth.h_dest));
@@ -192,76 +195,58 @@ static __always_inline int parse_l2(void* pos, struct option* opt, struct event*
 
     ev->l3_proto = bpf_ntohs(eth.h_proto);
     if(ev->l3_proto == ETH_P_8021Q || ev->l3_proto == ETH_P_8021AD) {
-        struct vlan_hdr vh;
-        bpf_probe_read_kernel(&vh, sizeof(vh), pos);
-
-        u16 tci = bpf_ntohs(vh.h_vlan_TCI);
-        ev->vlan_id = tci & VLAN_VID_MASK;
-        ev->vlan_prio = (tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
-        ev->l3_proto = bpf_ntohs(vh.h_vlan_encapsulated_proto);
-        pos += sizeof(vh);
+        pos += parse_vlan(pos, ev);
     }
 
-    FILTER_U32(ev->vlan_id, opt->vlan_id);
-    FILTER_U32(ev->vlan_prio, opt->vlan_prio);
-    FILTER_U32(ev->l3_proto, opt->l3_proto);
+    FILTER_EQ(ev->vlan_id, opt->vlan_id);
+    FILTER_EQ(ev->vlan_prio, opt->vlan_prio);
+    FILTER_EQ(ev->l3_proto, opt->l3_proto);
 
-    return parse_l3(pos, opt, ev);
+    return match_l3(pos, opt, ev);
 }
 
-static __always_inline int parse(struct sk_buff* skb, struct option* opt, struct event* ev)
+static __always_inline int
+match_skb_meta(struct sk_buff* skb, struct option* opt, struct event* ev)
 {
     struct net_device* dev;
-    u16 mac_header;
-    u16 network_header;
-    void *head, *pos;
 
     ev->length = BPF_CORE_READ(skb, len);
-    FILTER_U32(ev->length, opt->length);
+    FILTER_EQ(ev->length, opt->length);
 
     dev = BPF_CORE_READ(skb, dev);
     bpf_probe_read_kernel_str(ev->iface, sizeof(ev->iface), dev->name);
     FILTER_MEM(ev->iface, opt->iface, opt->iface[0]);
 
+    return 0;
+}
+
+static __always_inline int
+match_skb_headers(struct sk_buff* skb, struct option* opt, struct event* ev)
+{
+    void *head, *pos;
+    u16 mac_header;
+    u16 network_header;
+
     head = BPF_CORE_READ(skb, head);
     mac_header = BPF_CORE_READ(skb, mac_header);
     network_header = BPF_CORE_READ(skb, network_header);
 
-    if(!mac_header || mac_header == SKB_MAC_HEADER_INVALID) {
-        if(!network_header) {
+    if(mac_header == SKB_MAC_HEADER_INVALID) {
+        ev->l3_proto = bpf_ntohs(BPF_CORE_READ(skb, protocol));
+        if(!network_header || !ev->l3_proto)
             return -1;
-        }
-        ev->l3_proto = BPF_CORE_READ(skb, protocol);
-        ev->l3_proto = bpf_ntohs(ev->l3_proto);
-        if(!ev->l3_proto) {
-            return -1;
-        }
-        FILTER_U32(ev->l3_proto, opt->l3_proto);
+
+        FILTER_EQ(ev->l3_proto, opt->l3_proto);
 
         pos = head + network_header;
-        return parse_l3(pos, opt, ev);
-    } else if(mac_header >= network_header) {
+        return match_l3(pos, opt, ev);
+    }
+
+    if(mac_header >= network_header)
         return -1;
-    } else {
-        pos = head + mac_header;
-        return parse_l2(pos, opt, ev);
-    }
-}
 
-static __always_inline int trace(struct sk_buff* skb, struct option* opt, struct event* ev)
-{
-    if(parse(skb, opt, ev)) {
-        bpf_ringbuf_discard(ev, 0);
-        return 0;
-    }
-
-    if(!rl_allow(opt, ev)) {
-        bpf_ringbuf_discard(ev, 0);
-        return 0;
-    }
-
-    bpf_ringbuf_submit(ev, 0);
-    return 0;
+    pos = head + mac_header;
+    return match_l2(pos, opt, ev);
 }
 
 SEC("tracepoint/skb/kfree_skb")
@@ -285,7 +270,14 @@ int trace_skb(struct trace_event_raw_kfree_skb* ctx)
     ev->location = (u64)ctx->location;
     ev->timestamp = bpf_ktime_get_ns();
 
-    return trace(skb, opt, ev);
+    if(match_skb_meta(skb, opt, ev) || match_skb_headers(skb, opt, ev) ||
+    !rl_allow(opt, ev)) {
+        bpf_ringbuf_discard(ev, 0);
+        return 0;
+    }
+
+    bpf_ringbuf_submit(ev, 0);
+    return 0;
 }
 
 char LICENSE[] SEC("license") = "Dual MIT/GPL";
