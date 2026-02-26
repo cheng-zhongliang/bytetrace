@@ -66,6 +66,12 @@ struct {
     __uint(max_entries, 1 << 24);
 } events SEC(".maps");
 
+struct trace_context {
+    struct sk_buff* skb;
+    struct option* opt;
+    struct event* ev;
+};
+
 static __always_inline void rl_refill(struct option* opt, u64 now)
 {
     /* last_fill in the future means time went backward or first use */
@@ -232,7 +238,8 @@ match_skb_headers(struct sk_buff* skb, struct option* opt, struct event* ev)
     network_header = BPF_CORE_READ(skb, network_header);
 
     if(mac_header == SKB_MAC_HEADER_INVALID) {
-        ev->l3_proto = bpf_ntohs(BPF_CORE_READ(skb, protocol));
+        ev->l3_proto = BPF_CORE_READ(skb, protocol);
+        ev->l3_proto = bpf_ntohs(ev->l3_proto);
         if(!network_header || !ev->l3_proto)
             return -1;
 
@@ -249,35 +256,54 @@ match_skb_headers(struct sk_buff* skb, struct option* opt, struct event* ev)
     return match_l2(pos, opt, ev);
 }
 
-SEC("tracepoint/skb/kfree_skb")
-int trace_skb(struct trace_event_raw_kfree_skb* ctx)
+static __always_inline int trace(struct trace_context* ctx)
 {
-    struct sk_buff* skb = ctx->skbaddr;
-    struct option* opt;
-    struct event* ev;
+    struct sk_buff* skb = ctx->skb;
+    struct option* opt = ctx->opt;
+    struct event* ev = ctx->ev;
+    int rc = 0;
 
-    opt = bpf_map_lookup_elem(&options, &(u32){ 0 });
-    if(!opt) {
-        return 0;
+    rc = match_skb_meta(skb, opt, ev);
+    if(rc) {
+        goto discard;
     }
-
-    ev = bpf_ringbuf_reserve(&events, sizeof(*ev), 0);
-    if(!ev) {
-        return 0;
+    rc = match_skb_headers(skb, opt, ev);
+    if(rc) {
+        goto discard;
     }
-
-    ev->reason = ctx->reason;
-    ev->location = (u64)ctx->location;
-    ev->timestamp = bpf_ktime_get_ns();
-
-    if(match_skb_meta(skb, opt, ev) || match_skb_headers(skb, opt, ev) ||
-    !rl_allow(opt, ev)) {
-        bpf_ringbuf_discard(ev, 0);
-        return 0;
+    if(!rl_allow(opt, ev)) {
+        goto discard;
     }
 
     bpf_ringbuf_submit(ev, 0);
     return 0;
+
+discard:
+    bpf_ringbuf_discard(ev, 0);
+    return 0;
+}
+
+SEC("tracepoint/skb/kfree_skb")
+int trace_skb(struct trace_event_raw_kfree_skb* raw)
+{
+    struct trace_context ctx = { 0 };
+
+    ctx.opt = bpf_map_lookup_elem(&options, &(u32){ 0 });
+    if(!ctx.opt) {
+        return 0;
+    }
+
+    ctx.ev = bpf_ringbuf_reserve(&events, sizeof(struct event), 0);
+    if(!ctx.ev) {
+        return 0;
+    }
+
+    ctx.skb = raw->skbaddr;
+    ctx.ev->reason = raw->reason;
+    ctx.ev->location = (u64)raw->location;
+    ctx.ev->timestamp = bpf_ktime_get_ns();
+
+    return trace(&ctx);
 }
 
 char LICENSE[] SEC("license") = "Dual MIT/GPL";
