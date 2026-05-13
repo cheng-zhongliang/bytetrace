@@ -19,7 +19,6 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-
 #include "log.h"
 
 #define MAX_CALLBACKS 32
@@ -38,14 +37,12 @@ static struct {
     Callback callbacks[MAX_CALLBACKS];
 } L;
 
-
 static const char* level_strings[] = { "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL" };
 
 #ifdef LOG_USE_COLOR
 static const char* level_colors[] = { "\x1b[94m", "\x1b[36m", "\x1b[32m",
     "\x1b[33m", "\x1b[31m", "\x1b[35m" };
 #endif
-
 
 static void stdout_callback(log_Event* ev)
 {
@@ -63,7 +60,6 @@ static void stdout_callback(log_Event* ev)
     fflush(ev->udata);
 }
 
-
 static void file_callback(log_Event* ev)
 {
     char buf[64];
@@ -75,14 +71,12 @@ static void file_callback(log_Event* ev)
     fflush(ev->udata);
 }
 
-
 static void lock(void)
 {
     if(L.lock) {
         L.lock(true, L.udata);
     }
 }
-
 
 static void unlock(void)
 {
@@ -91,12 +85,10 @@ static void unlock(void)
     }
 }
 
-
 const char* log_level_string(int level)
 {
     return level_strings[level];
 }
-
 
 void log_set_lock(log_LockFn fn, void* udata)
 {
@@ -104,18 +96,15 @@ void log_set_lock(log_LockFn fn, void* udata)
     L.udata = udata;
 }
 
-
 void log_set_level(int level)
 {
     L.level = level;
 }
 
-
 void log_set_quiet(bool enable)
 {
     L.quiet = enable;
 }
-
 
 int log_add_callback(log_LogFn fn, void* udata, int level)
 {
@@ -128,12 +117,10 @@ int log_add_callback(log_LogFn fn, void* udata, int level)
     return -1;
 }
 
-
 int log_add_fp(FILE* fp, int level)
 {
     return log_add_callback(file_callback, fp, level);
 }
-
 
 static void init_event(log_Event* ev, void* udata)
 {
@@ -143,7 +130,6 @@ static void init_event(log_Event* ev, void* udata)
     }
     ev->udata = udata;
 }
-
 
 void log_log(int level, const char* file, int line, const char* fmt, ...)
 {

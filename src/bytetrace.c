@@ -12,7 +12,7 @@ static volatile sig_atomic_t g_running = 1;
 static int set_log_level(struct argparse* self, const struct argparse_option* option)
 {
     (void)self;
-   
+
     int level = *(int*)option->value;
     switch(level) {
     case 0: level = LOG_TRACE; break;
@@ -26,7 +26,7 @@ static int set_log_level(struct argparse* self, const struct argparse_option* op
 
     log_set_level(level);
     log_set_quiet(false);
-    
+
     return 0;
 }
 
@@ -37,7 +37,7 @@ static int print_version(struct argparse* self, const struct argparse_option* op
 
     printf("version: %s\n", BYTETRACE_VERSION);
     exit(0);
-    
+
     return 0;
 }
 
