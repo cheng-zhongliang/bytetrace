@@ -26,4 +26,8 @@ struct trace_config {
 
 struct trace_context;
 
+struct trace_context* trace_new(const struct trace_config* config);
+void trace_free(struct trace_context* ctx);
+int trace_dispatch(struct trace_context* ctx);
+
 #endif
