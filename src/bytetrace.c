@@ -6,6 +6,7 @@
 #include "argparse.h"
 #include "bytetrace.h"
 #include "log.h"
+#include "trace.h"
 
 static volatile sig_atomic_t g_running = 1;
 
@@ -41,7 +42,7 @@ static int print_version(struct argparse* self, const struct argparse_option* op
     return 0;
 }
 
-static int parse_args(int argc, char** argv)
+static int parse_args(int argc, char** argv, struct trace_config* cfg)
 {
     int log_level;
 
@@ -76,13 +77,17 @@ static void sig_handler(int sig)
 int main(int argc, char** argv)
 {
     int rc;
+    struct trace_config cfg;
+    struct trace_context* ctx;
 
     log_set_quiet(true);
 
-    rc = parse_args(argc, argv);
+    rc = parse_args(argc, argv, &cfg);
     if(rc != 0) {
         return -1;
     }
+
+    ctx = trace_new(&cfg);
 
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
@@ -90,8 +95,10 @@ int main(int argc, char** argv)
     log_info("Tracing... Press Ctrl+C to stop.");
 
     while(g_running) {
-        sleep(1);
+        trace_dispatch(ctx);
     }
+
+    trace_free(ctx);
 
     log_info("Bye!");
 
