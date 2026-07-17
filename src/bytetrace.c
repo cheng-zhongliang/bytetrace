@@ -10,6 +10,12 @@
 
 static volatile sig_atomic_t g_running = 1;
 
+static void output_event(const struct trace_event* event, void* data)
+{
+    (void)event;
+    (void)data;
+}
+
 static int set_log_level(struct argparse* self, const struct argparse_option* option)
 {
     (void)self;
@@ -44,6 +50,7 @@ static int print_version(struct argparse* self, const struct argparse_option* op
 
 static int parse_args(int argc, char** argv, struct trace_config* cfg)
 {
+    (void)cfg;
     int log_level;
 
     struct argparse_option options[] = {
@@ -77,7 +84,7 @@ static void sig_handler(int sig)
 int main(int argc, char** argv)
 {
     int rc;
-    struct trace_config cfg;
+    struct trace_config cfg = {0};
     struct trace_context* ctx;
 
     log_set_quiet(true);
@@ -87,7 +94,11 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    ctx = trace_new(&cfg);
+    ctx = trace_context_new(&cfg, output_event, NULL);
+    if(!ctx) {
+        log_error("failed to create trace context");
+        return -1;
+    }
 
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
@@ -95,10 +106,14 @@ int main(int argc, char** argv)
     log_info("Tracing... Press Ctrl+C to stop.");
 
     while(g_running) {
-        trace_dispatch(ctx);
+        rc = trace_context_dispatch(ctx, 1000);
+        if(rc < 0) {
+            log_error("trace dispatch failed");
+            break;
+        }
     }
 
-    trace_free(ctx);
+    trace_context_free(ctx);
 
     log_info("Bye!");
 
