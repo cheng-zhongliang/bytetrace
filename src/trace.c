@@ -1,31 +1,60 @@
+#include <stdlib.h>
+
+#include "abi.h"
 #include "trace.h"
 
 struct trace_context {
-    unsigned char unused;
+    const char* btf_path;
+    const char* iface;
+
+    struct trace_config cfg;
 };
 
-static struct trace_context g_context;
-
-struct trace_context* trace_context_new(const struct trace_config* config,
-                                        trace_event_callback cb,
-                                        void* data)
+struct trace_context* trace_context_new(void)
 {
-    (void)config;
-    (void)cb;
-    (void)data;
+    struct trace_context* ctx;
 
-    return &g_context;
+    ctx = calloc(1, sizeof(*ctx));
+    if(!ctx) {
+        return NULL;
+    }
+
+    ctx->cfg.filters = TRACE_FILTER_NONE;
+    ctx->cfg.ratelimit = false;
+
+    return ctx;
 }
 
-void trace_context_free(struct trace_context* ctx)
+int trace_context_set_btf_path(struct trace_context* ctx, const char* path)
 {
-    (void)ctx;
+    if(!ctx || !path || path[0] == '\0') {
+        return -1;
+    }
+
+    ctx->btf_path = path;
+
+    return 0;
 }
 
-int trace_context_dispatch(struct trace_context* ctx, int timeout_ms)
+int trace_context_set_ratelimit(struct trace_context* ctx, bool enabled)
 {
-    (void)ctx;
-    (void)timeout_ms;
+    if(!ctx) {
+        return -1;
+    }
+
+    ctx->cfg.ratelimit = enabled;
+
+    return 0;
+}
+
+int trace_context_set_filter_iface(struct trace_context* ctx, const char* iface)
+{
+    if(!ctx || !iface || iface[0] == '\0') {
+        return -1;
+    }
+
+    ctx->iface = iface;
+    ctx->cfg.filters |= TRACE_FILTER_IFACE;
 
     return 0;
 }

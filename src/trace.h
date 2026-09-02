@@ -4,39 +4,41 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "abi.h"
-
-struct trace_config {
-    const char* btf_path;
-    bool ratelimit;
-    uint32_t filters;
-
-    char iface[16];
-
-    uint8_t src_mac[6];
-    uint8_t dst_mac[6];
-
-    uint16_t vlan_id;
-    uint8_t vlan_prio;
-    uint16_t eth_proto;
-
-    uint32_t src_ip;
-    uint32_t dst_ip;
-    uint8_t src_ipv6[16];
-    uint8_t dst_ipv6[16];
-
-    uint8_t ip_proto;
-    uint16_t src_port;
-    uint16_t dst_port;
-};
-
 struct trace_context;
 
-typedef void (*trace_event_callback)(const struct trace_event* event, void* data);
+/*
+ * Creates a context with rate limiting and all filters disabled.
+ * Returns NULL if memory allocation fails.
+ */
+struct trace_context* trace_context_new(void);
 
-struct trace_context*
-trace_context_new(const struct trace_config* config, trace_event_callback cb, void* data);
-void trace_context_free(struct trace_context* ctx);
+/* Setters must be called before trace_context_attach(). */
+/* path must remain valid until trace_context_free() is called. */
+int trace_context_set_btf_path(struct trace_context* ctx, const char* path);
+int trace_context_set_ratelimit(struct trace_context* ctx, bool enabled);
+/* iface must remain valid until trace_context_free() is called. */
+int trace_context_set_filter_iface(struct trace_context* ctx, const char* iface);
+int trace_context_set_filter_packet_len(struct trace_context* ctx, uint32_t length);
+int trace_context_set_filter_src_mac(struct trace_context* ctx, const char* address);
+int trace_context_set_filter_dst_mac(struct trace_context* ctx, const char* address);
+int trace_context_set_filter_vlan_id(struct trace_context* ctx, uint16_t vlan_id);
+int trace_context_set_filter_vlan_prio(struct trace_context* ctx, uint8_t priority);
+int trace_context_set_filter_eth_proto(struct trace_context* ctx, uint16_t protocol);
+int trace_context_set_filter_src_ip(struct trace_context* ctx, const char* address);
+int trace_context_set_filter_dst_ip(struct trace_context* ctx, const char* address);
+int trace_context_set_filter_ip_proto(struct trace_context* ctx, uint8_t protocol);
+int trace_context_set_filter_src_port(struct trace_context* ctx, uint16_t port);
+int trace_context_set_filter_dst_port(struct trace_context* ctx, uint16_t port);
+
+int trace_context_attach(struct trace_context* ctx);
+
+/*
+ * Returns the number of processed events, 0 on timeout, or a negative value
+ * on error.
+ */
 int trace_context_dispatch(struct trace_context* ctx, int timeout_ms);
+
+/* Detaches tracing resources and accepts NULL. */
+void trace_context_free(struct trace_context* ctx);
 
 #endif
